@@ -11,7 +11,7 @@ crons = ["*/5 * * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "stability-admin-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "cab5d9a8-28b7-4942-95dd-6dee7e571c02"
 
 # Secrets (코드/저장소에 절대 값 커밋하지 말 것 — wrangler secret put 으로 등록)
 #   SESSION_SECRET     세션 토큰 서명용 임의의 긴 문자열
