@@ -22,7 +22,9 @@ export const stabilitySchedules = sqliteTable("stability_schedules", {
   batchId: text("batch_id").notNull(),
   productName: text("product_name").notNull(),
   labNo: text("lab_no").notNull(),
-  targetDate: text("target_date").notNull(), // 'YYYY-MM-DD' (KST), 매일 09:00에 발송
+  targetDate: text("target_date").notNull(), // 'YYYY-MM-DD' (KST)
+  targetHour: integer("target_hour").notNull(), // 0-23 (KST), "안정도 시작" 클릭 시각
+  targetMinute: integer("target_minute").notNull(), // 0-59 (KST)
   label: text("label").notNull(), // '1일', '1주', '2주', '1개월', '2개월', '3개월'
   sent: integer("sent", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull().default("CURRENT_TIMESTAMP"),

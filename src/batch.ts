@@ -5,10 +5,9 @@ import { sendTeamsAlarm } from "./lib/teams";
 import { nowKst } from "./lib/time";
 import type { Env } from "./types";
 
-const ALARM_HOUR = 9; // 매 체크포인트 오전 9시(KST) 발송
-
 // Cron Trigger(5분 간격)가 호출합니다. target_date가 지났거나,
-// 오늘이면서 오전 9시가 지난, 아직 안 보낸 스케줄을 발송합니다.
+// 오늘이면서 (target_hour:target_minute)이 지난, 아직 안 보낸 스케줄을 발송합니다.
+// target_hour/target_minute은 "안정도 시작" 클릭 시각(KST)입니다.
 export async function runDueAlarms(env: Env) {
   const db = drizzle(env.DB);
   const { hour, minute, dateStr } = nowKst();
@@ -20,7 +19,7 @@ export async function runDueAlarms(env: Env) {
     .where(and(eq(stabilitySchedules.sent, false), lte(stabilitySchedules.targetDate, dateStr)));
 
   const due = candidates.filter(
-    (s) => s.targetDate < dateStr || nowMinutes >= ALARM_HOUR * 60
+    (s) => s.targetDate < dateStr || nowMinutes >= s.targetHour * 60 + s.targetMinute
   );
 
   for (const schedule of due) {

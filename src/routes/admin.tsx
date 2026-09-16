@@ -4,7 +4,7 @@ import { eq, desc } from "drizzle-orm";
 import { stabilitySchedules, batchLogs } from "../db/schema";
 import { requireAuth } from "../middleware/auth";
 import { Layout } from "../views/layout";
-import { kstTodayDateOnly, addDays, addMonths, formatDateStr } from "../lib/time";
+import { kstTodayDateOnly, addDays, addMonths, formatDateStr, nowKst } from "../lib/time";
 import type { Env, Variables } from "../types";
 
 export const adminRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -61,7 +61,7 @@ adminRoutes.get("/admin", async (c) => {
           <button type="submit">안정도 시작</button>
         </form>
         <p style="font-size:13px;color:#6b7280;margin-top:10px;">
-          클릭 시 오늘 기준 1일 / 1주 / 2주 / 1개월 / 2개월 / 3개월 후 오전 9시(KST)에
+          클릭한 시각(KST) 기준으로 1일 / 1주 / 2주 / 1개월 / 2개월 / 3개월 후 같은 시각에
           Teams로 알람이 예약됩니다.
         </p>
       </div>
@@ -84,7 +84,7 @@ adminRoutes.get("/admin", async (c) => {
               <thead>
                 <tr>
                   <th>구간</th>
-                  <th>예정일(KST 09:00)</th>
+                  <th>예정 시각(KST)</th>
                   <th>상태</th>
                 </tr>
               </thead>
@@ -92,7 +92,10 @@ adminRoutes.get("/admin", async (c) => {
                 {batch.items.map((item) => (
                   <tr>
                     <td>{item.label}</td>
-                    <td>{item.targetDate}</td>
+                    <td>
+                      {item.targetDate} {String(item.targetHour).padStart(2, "0")}:
+                      {String(item.targetMinute).padStart(2, "0")}
+                    </td>
                     <td>
                       <span class={`badge ${item.sent ? "on" : "off"}`}>
                         {item.sent ? "발송완료" : "대기"}
@@ -121,6 +124,7 @@ adminRoutes.post("/admin/stability", async (c) => {
 
   const batchId = crypto.randomUUID();
   const today = kstTodayDateOnly();
+  const { hour, minute } = nowKst();
 
   const values = CHECKPOINTS.map((cp) => {
     const target = cp.addDays !== undefined ? addDays(today, cp.addDays) : addMonths(today, cp.addMonths!);
@@ -129,6 +133,8 @@ adminRoutes.post("/admin/stability", async (c) => {
       productName,
       labNo,
       targetDate: formatDateStr(target),
+      targetHour: hour,
+      targetMinute: minute,
       label: cp.label,
       sent: false,
     };
