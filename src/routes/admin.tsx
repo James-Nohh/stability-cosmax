@@ -61,7 +61,7 @@ function formatGrade(grade: number | null, note: string | null): string {
 }
 
 function ph25Text(ph: string | null, viscosity: string | null): string | null {
-  const parts = [ph && `pH ${ph}`, viscosity && `점도 ${viscosity}`].filter(Boolean) as string[];
+  const parts = [ph && `pH ${ph}`, viscosity && `점(경)도 ${viscosity}`].filter(Boolean) as string[];
   return parts.length ? parts.join(", ") : null;
 }
 
@@ -422,11 +422,11 @@ adminRoutes.get("/ack/:id", async (c) => {
                   </div>
                   {cond.field === "gradeC25" && (
                     <div style="display:flex;gap:8px;margin-top:8px;">
-                      <div style="flex:1">
+                      <div>
                         <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">pH</label>
-                        <input type="text" name="ph25c" value={schedule.ph25c ?? ""} style="width:100%" />
+                        <input type="text" name="ph25c" value={schedule.ph25c ?? ""} style="width:80px" />
                       </div>
-                      <div style="flex:1">
+                      <div>
                         <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">
                           점(경)도
                         </label>
@@ -434,7 +434,7 @@ adminRoutes.get("/ack/:id", async (c) => {
                           type="text"
                           name="viscosity25c"
                           value={schedule.viscosity25c ?? ""}
-                          style="width:100%"
+                          style="width:80px"
                         />
                       </div>
                     </div>
