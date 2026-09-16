@@ -48,6 +48,10 @@ export const stabilitySchedules = sqliteTable("stability_schedules", {
   noteC45: text("note_45c"),
   noteSunlight: text("note_sunlight"),
 
+  // 25℃ 항목 전용 추가 측정값
+  ph25c: text("ph_25c"),
+  viscosity25c: text("viscosity_25c"),
+
   createdAt: text("created_at").notNull().default("CURRENT_TIMESTAMP"),
 });
 

@@ -51,9 +51,18 @@ const CONDITIONS = [
 
 const REASON_OPTIONS = ["분리", "변색", "변취"];
 
-function formatGrade(grade: number | null, note: string | null): string {
-  if (grade == null) return "-";
+function gradeNoteText(grade: number | null, note: string | null): string | null {
+  if (grade == null) return null;
   return note ? `${grade} (${note})` : String(grade);
+}
+
+function formatGrade(grade: number | null, note: string | null): string {
+  return gradeNoteText(grade, note) ?? "-";
+}
+
+function ph25Text(ph: string | null, viscosity: string | null): string | null {
+  const parts = [ph && `pH ${ph}`, viscosity && `점도 ${viscosity}`].filter(Boolean) as string[];
+  return parts.length ? parts.join(", ") : null;
 }
 
 const SNOOZE_OPTIONS = [
@@ -170,7 +179,14 @@ adminRoutes.get("/admin", async (c) => {
                         </span>
                       </td>
                       {CONDITIONS.map((cond) => (
-                        <td>{formatGrade(item[cond.field], item[cond.noteField])}</td>
+                        <td>
+                          {formatGrade(item[cond.field], item[cond.noteField])}
+                          {cond.field === "gradeC25" && ph25Text(item.ph25c, item.viscosity25c) && (
+                            <div style="font-size:11px;color:#6b7280;">
+                              {ph25Text(item.ph25c, item.viscosity25c)}
+                            </div>
+                          )}
+                        </td>
                       ))}
                     </tr>
                   ))}
@@ -245,10 +261,10 @@ adminRoutes.get("/admin/stability/:batchId/export", async (c) => {
     ...sorted.map((row) => [
       row.label,
       ...CONDITIONS.map((cond) => {
-        const grade = row[cond.field];
-        if (grade == null) return "";
-        const note = row[cond.noteField];
-        return note ? `${grade} (${note})` : String(grade);
+        const base = gradeNoteText(row[cond.field], row[cond.noteField]) ?? "";
+        if (cond.field !== "gradeC25") return base;
+        const extra = ph25Text(row.ph25c, row.viscosity25c);
+        return extra ? `${base} [${extra}]`.trim() : base;
       }),
     ]),
   ];
@@ -404,6 +420,25 @@ adminRoutes.get("/ack/:id", async (c) => {
                       ))}
                     </div>
                   </div>
+                  {cond.field === "gradeC25" && (
+                    <div style="display:flex;gap:8px;margin-top:8px;">
+                      <div style="flex:1">
+                        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">pH</label>
+                        <input type="text" name="ph25c" value={schedule.ph25c ?? ""} style="width:100%" />
+                      </div>
+                      <div style="flex:1">
+                        <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">
+                          점(경)도
+                        </label>
+                        <input
+                          type="text"
+                          name="viscosity25c"
+                          value={schedule.viscosity25c ?? ""}
+                          style="width:100%"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -445,9 +480,17 @@ adminRoutes.post("/ack/:id", async (c) => {
     values[cond.noteField] = grade && grade > 0 && notes.length > 0 ? notes.join(",") : null;
   }
 
+  const ph25c = typeof body.ph25c === "string" ? body.ph25c.trim() : "";
+  const viscosity25c = typeof body.viscosity25c === "string" ? body.viscosity25c.trim() : "";
+
   await db
     .update(stabilitySchedules)
-    .set({ ...values, acknowledgedAt: Date.now() })
+    .set({
+      ...values,
+      ph25c: ph25c || null,
+      viscosity25c: viscosity25c || null,
+      acknowledgedAt: Date.now(),
+    })
     .where(eq(stabilitySchedules.id, id));
 
   return c.html(
