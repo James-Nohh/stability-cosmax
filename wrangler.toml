@@ -3,8 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
 
-# 5분마다 실행 — DB에 저장된 알람 설정(hour/minute)과 현재 시각(KST)이
-# 일치하고 오늘 아직 실행되지 않은 알람만 골라서 발송합니다.
+# 5분마다 실행 — 예정일이 지났고 아직 발송 안 된 안정도 알람을 찾아 발송합니다.
 [triggers]
 crons = ["*/5 * * * *"]
 
@@ -14,5 +13,6 @@ database_name = "stability-admin-db"
 database_id = "cab5d9a8-28b7-4942-95dd-6dee7e571c02"
 
 # Secrets (코드/저장소에 절대 값 커밋하지 말 것 — wrangler secret put 으로 등록)
-#   SESSION_SECRET     세션 토큰 서명용 임의의 긴 문자열
-#   TEAMS_WEBHOOK_URL  Power Automate "웹훅 요청을 받으면 채널에 게시" 워크플로 URL
+#   SESSION_SECRET        세션 토큰 서명용 임의의 긴 문자열
+#   TEAMS_WEBHOOK_URL     Power Automate "채널에 웹후크 알림 보내기" 워크플로 URL
+#   TEAMS_WEBHOOK_URL_DM  Power Automate "채팅에 웹후크 알림 보내기" 워크플로 URL (개인 채팅)

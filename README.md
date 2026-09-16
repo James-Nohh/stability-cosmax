@@ -46,10 +46,12 @@ npm run db:migrate:remote
 ```bash
 npx wrangler secret put SESSION_SECRET
 npx wrangler secret put TEAMS_WEBHOOK_URL
+npx wrangler secret put TEAMS_WEBHOOK_URL_DM
 ```
 
 - `SESSION_SECRET`: 임의의 긴 랜덤 문자열
-- `TEAMS_WEBHOOK_URL`: Teams 채널 → Workflows 앱 → "웹훅 요청을 받으면 채널에 게시" 템플릿으로 생성한 URL
+- `TEAMS_WEBHOOK_URL`: Teams → Workflows 앱 → "채널에 웹후크 알림 보내기" 템플릿으로 생성한 URL
+- `TEAMS_WEBHOOK_URL_DM`: Teams → Workflows 앱 → "채팅에 웹후크 알림 보내기" 템플릿으로 생성한 URL (개인 채팅으로 발송)
 
 ### 5. 관리자 계정 생성
 

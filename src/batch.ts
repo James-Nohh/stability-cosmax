@@ -24,26 +24,29 @@ export async function runDueAlarms(env: Env) {
   );
 
   for (const schedule of due) {
-    try {
-      await sendTeamsAlarm(
-        env.TEAMS_WEBHOOK_URL,
-        schedule.productName,
-        `Lab No. ${schedule.labNo}\n\n안정도를 확인하세요 (${schedule.label} 경과)`
-      );
-      await db
-        .update(stabilitySchedules)
-        .set({ sent: true })
-        .where(eq(stabilitySchedules.id, schedule.id));
-      await db.insert(batchLogs).values({
-        scheduleId: schedule.id,
-        status: "success",
-      });
-    } catch (err) {
-      await db.insert(batchLogs).values({
-        scheduleId: schedule.id,
-        status: "error",
-        detail: err instanceof Error ? err.message : String(err),
-      });
-    }
+    const message = `Lab No. ${schedule.labNo}\n\n안정도를 확인하세요 (${schedule.label} 경과)`;
+
+    // 채널 + 개인 채팅 둘 다 발송. 하나라도 성공하면 재발송을 막기 위해
+    // sent = true로 표시하고, 실패한 웹훅이 있으면 로그에 남깁니다.
+    const results = await Promise.allSettled([
+      sendTeamsAlarm(env.TEAMS_WEBHOOK_URL, schedule.productName, message),
+      sendTeamsAlarm(env.TEAMS_WEBHOOK_URL_DM, schedule.productName, message),
+    ]);
+    const failures = results.filter(
+      (r): r is PromiseRejectedResult => r.status === "rejected"
+    );
+
+    await db
+      .update(stabilitySchedules)
+      .set({ sent: true })
+      .where(eq(stabilitySchedules.id, schedule.id));
+    await db.insert(batchLogs).values({
+      scheduleId: schedule.id,
+      status: failures.length === 0 ? "success" : "error",
+      detail:
+        failures.length === 0
+          ? null
+          : failures.map((f) => String(f.reason)).join("; "),
+    });
   }
 }
