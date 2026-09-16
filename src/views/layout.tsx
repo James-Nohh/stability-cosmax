@@ -12,6 +12,7 @@ export const Layout: FC<PropsWithChildren<{ title: string; showNav?: boolean }>>
       <title>{title}</title>
       <style>{`
         * { box-sizing: border-box; }
+        form { margin: 0; }
         body { font-family: -apple-system, "Segoe UI", sans-serif; margin: 0; background: #f5f6f8; color: #1a1a1a; }
         header { background: #1f2937; color: #fff; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; }
         header a { color: #fff; text-decoration: none; font-weight: 600; }
