@@ -79,11 +79,12 @@ npm run dev
 npm run deploy
 ```
 
-## 알람 사용법
+## 안정도 알람 사용법
 
-1. `/admin`에서 로그인 후 알람 추가 (제목, 메시지, 매일 발송할 시/분 — KST 기준)
-2. Cron Trigger가 5분마다 깨어나 현재 시각과 일치하고 당일 미발송인 알람을 찾아 Teams로 전송
-3. `/admin/logs`에서 발송 성공/실패 이력 확인
+1. `/admin`에서 로그인 후 제품명 / Lab No.를 입력하고 "안정도 시작" 클릭
+2. 오늘 기준 1일 / 1주 / 2주 / 1개월 / 2개월 / 3개월 후 오전 9시(KST)에 발송될 6건의 알람이 자동 예약됨
+3. Cron Trigger가 5분마다 깨어나 예정일이 지난 미발송 건을 찾아 Teams로 전송 (제목: 제품명, 내용: Lab No. + "안정도를 확인하세요")
+4. `/admin/logs`에서 발송 성공/실패 이력 확인
 
 ## 디렉토리 구조
 
@@ -92,7 +93,7 @@ src/
   index.ts          앱 엔트리 (fetch + scheduled 핸들러)
   batch.ts          일자별 배치 알람 실행 로직
   types.ts          Env/Variables 타입
-  db/schema.ts       Drizzle 스키마 (users, sessions, alarm_configs, batch_logs)
+  db/schema.ts       Drizzle 스키마 (users, sessions, stability_schedules, batch_logs)
   lib/
     password.ts       PBKDF2 해싱/검증
     session.ts        세션 생성/조회/삭제
@@ -101,8 +102,8 @@ src/
   middleware/auth.ts    로그인 필요 라우트 가드
   routes/
     auth.tsx            로그인/로그아웃
-    admin.tsx            알람 CRUD, 로그 조회
+    admin.tsx            안정도 시작/조회, 로그 조회
   views/layout.tsx     공통 레이아웃
 scripts/hash-password.mjs   관리자 계정 생성용 로컬 스크립트
-migrations/0000_init.sql    초기 D1 스키마
+migrations/                  D1 스키마 마이그레이션
 ```

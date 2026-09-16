@@ -38,7 +38,7 @@ export const Layout: FC<PropsWithChildren<{ title: string; showNav?: boolean }>>
         <header>
           <a href="/admin">안정도관리 알람</a>
           <nav>
-            <a href="/admin">알람 설정</a>
+            <a href="/admin">안정도 관리</a>
             <a href="/admin/logs">실행 로그</a>
             <form class="inline" method="post" action="/logout">
               <button type="submit" class="secondary">로그아웃</button>

@@ -15,22 +15,24 @@ export const sessions = sqliteTable("sessions", {
   expiresAt: text("expires_at").notNull(),
 });
 
-export const alarmConfigs = sqliteTable("alarm_configs", {
+// "안정도 시작" 버튼 한 번에 6개(1일/1주/2주/1개월/2개월/3개월 후) 행이
+// 같은 batchId로 묶여서 생성됩니다.
+export const stabilitySchedules = sqliteTable("stability_schedules", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  title: text("title").notNull(),
-  message: text("message").notNull(),
-  scheduleHour: integer("schedule_hour").notNull(), // 0-23, KST 기준
-  scheduleMinute: integer("schedule_minute").notNull(), // 0-59, KST 기준
-  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
-  lastRunDate: text("last_run_date"), // 'YYYY-MM-DD' (KST), 하루 1회만 발송하기 위한 중복 방지
+  batchId: text("batch_id").notNull(),
+  productName: text("product_name").notNull(),
+  labNo: text("lab_no").notNull(),
+  targetDate: text("target_date").notNull(), // 'YYYY-MM-DD' (KST), 매일 09:00에 발송
+  label: text("label").notNull(), // '1일', '1주', '2주', '1개월', '2개월', '3개월'
+  sent: integer("sent", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull().default("CURRENT_TIMESTAMP"),
 });
 
 export const batchLogs = sqliteTable("batch_logs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  alarmConfigId: integer("alarm_config_id")
+  scheduleId: integer("schedule_id")
     .notNull()
-    .references(() => alarmConfigs.id),
+    .references(() => stabilitySchedules.id),
   status: text("status", { enum: ["success", "error"] }).notNull(),
   detail: text("detail"),
   runAt: text("run_at").notNull().default("CURRENT_TIMESTAMP"),

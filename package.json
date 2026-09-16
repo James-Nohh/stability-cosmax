@@ -13,20 +13,20 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "hono": "^4.6.14",
-    "drizzle-orm": "^0.36.4"
+    "drizzle-orm": "^0.36.4",
+    "hono": "^4.6.14"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250109.0",
+    "@cloudflare/workers-types": "^5.20260915.1",
     "drizzle-kit": "^0.28.1",
     "typescript": "^5.7.2",
-    "wrangler": "^3.99.0"
+    "wrangler": "^4.132.0"
   },
   "allowScripts": {
-    "esbuild@0.18.20": true,
-    "esbuild@0.19.12": true,
-    "esbuild@0.17.19": true,
     "sharp@0.33.5": true,
-    "workerd@1.20250718.0": true
+    "workerd@1.20260915.1": true,
+    "esbuild@0.28.1": true,
+    "esbuild@0.18.20": true,
+    "esbuild@0.19.12": true
   }
 }
