@@ -24,6 +24,7 @@ export const Layout: FC<PropsWithChildren<{ title: string; showNav?: boolean }>>
         button { background: #2563eb; color: #fff; border: none; cursor: pointer; }
         button.danger { background: #dc2626; }
         button.secondary { background: #6b7280; }
+        a.btn-excel { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; padding: 8px 12px; border-radius: 4px; border: none; background: #217346; color: #fff; font-size: 14px; line-height: normal; text-decoration: none; }
         form.inline { display: inline; }
         .row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
         .row label { font-size: 13px; color: #4b5563; display: block; margin-bottom: 4px; }

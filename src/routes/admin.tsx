@@ -135,11 +135,8 @@ adminRoutes.get("/admin", async (c) => {
                 <strong>{batch.productName}</strong>{" "}
                 <span style="color:#6b7280;">· Lab No. {batch.labNo}</span>
               </div>
-              <div style="display:flex;gap:8px;">
-                <a
-                  href={`/admin/stability/${batchId}/export`}
-                  style="background:#6b7280;color:#fff;border:none;border-radius:4px;padding:8px 12px;font-size:14px;text-decoration:none;"
-                >
+              <div style="display:flex;gap:8px;align-items:center;">
+                <a href={`/admin/stability/${batchId}/export`} class="btn-excel">
                   엑셀 다운로드
                 </a>
                 <form method="post" action={`/admin/stability/${batchId}/delete`}>
