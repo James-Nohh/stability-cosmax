@@ -24,7 +24,7 @@ export async function runDueAlarms(env: Env) {
   );
 
   for (const schedule of due) {
-    const title = `[안정도 관리] ${schedule.productName}`;
+    const title = `[안정도 알람] ${schedule.productName}`;
     const message = `Lab No. ${schedule.labNo}\n\n안정도를 확인하세요 (${schedule.label} 경과)`;
 
     // 채널 + 개인 채팅 둘 다 발송. 하나라도 성공하면 재발송을 막기 위해
