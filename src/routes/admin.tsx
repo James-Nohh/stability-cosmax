@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { drizzle } from "drizzle-orm/d1";
 import { eq, desc } from "drizzle-orm";
+import { raw } from "hono/utils/html";
 import * as XLSX from "xlsx";
 import { stabilitySchedules, batchLogs } from "../db/schema";
 import { requireAuth } from "../middleware/auth";
@@ -412,7 +413,8 @@ adminRoutes.get("/ack/:id", async (c) => {
           })}
           <button type="submit">저장</button>
         </form>
-        <script>{`
+        <script>
+          {raw(`
           document.querySelectorAll('.grade-radio').forEach(function (radio) {
             radio.addEventListener('change', function () {
               var box = document.getElementById(this.getAttribute('data-note-target'));
@@ -420,7 +422,8 @@ adminRoutes.get("/ack/:id", async (c) => {
               box.style.display = this.value === '0' ? 'none' : 'block';
             });
           });
-        `}</script>
+        `)}
+        </script>
       </div>
     </Layout>
   );
