@@ -41,6 +41,13 @@ export const stabilitySchedules = sqliteTable("stability_schedules", {
   gradeC45: integer("grade_45c"),
   gradeSunlight: integer("grade_sunlight"),
 
+  // 등급 1~3일 때 선택하는 특이사항(분리/변색/변취), 콤마로 구분해 저장
+  noteC4: text("note_4c"),
+  noteC25: text("note_25c"),
+  noteC37: text("note_37c"),
+  noteC45: text("note_45c"),
+  noteSunlight: text("note_sunlight"),
+
   createdAt: text("created_at").notNull().default("CURRENT_TIMESTAMP"),
 });
 

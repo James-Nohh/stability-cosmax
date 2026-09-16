@@ -29,12 +29,31 @@ const GRADE_LABELS = [
 ];
 
 const CONDITIONS = [
-  { field: "gradeC4", inputName: "grade4c", label: "4℃" },
-  { field: "gradeC25", inputName: "grade25c", label: "25℃" },
-  { field: "gradeC37", inputName: "grade37c", label: "37℃" },
-  { field: "gradeC45", inputName: "grade45c", label: "45℃" },
-  { field: "gradeSunlight", inputName: "gradeSunlight", label: "일광" },
-] as const satisfies { field: keyof typeof stabilitySchedules.$inferSelect; inputName: string; label: string }[];
+  { field: "gradeC4", inputName: "grade4c", noteField: "noteC4", noteInputName: "note4c", label: "4℃" },
+  { field: "gradeC25", inputName: "grade25c", noteField: "noteC25", noteInputName: "note25c", label: "25℃" },
+  { field: "gradeC37", inputName: "grade37c", noteField: "noteC37", noteInputName: "note37c", label: "37℃" },
+  { field: "gradeC45", inputName: "grade45c", noteField: "noteC45", noteInputName: "note45c", label: "45℃" },
+  {
+    field: "gradeSunlight",
+    inputName: "gradeSunlight",
+    noteField: "noteSunlight",
+    noteInputName: "noteSunlight",
+    label: "일광",
+  },
+] as const satisfies {
+  field: keyof typeof stabilitySchedules.$inferSelect;
+  inputName: string;
+  noteField: keyof typeof stabilitySchedules.$inferSelect;
+  noteInputName: string;
+  label: string;
+}[];
+
+const REASON_OPTIONS = ["분리", "변색", "변취"];
+
+function formatGrade(grade: number | null, note: string | null): string {
+  if (grade == null) return "-";
+  return note ? `${grade} (${note})` : String(grade);
+}
 
 const SNOOZE_OPTIONS = [
   { minutes: 30, label: "30분 뒤" },
@@ -153,7 +172,7 @@ adminRoutes.get("/admin", async (c) => {
                         </span>
                       </td>
                       {CONDITIONS.map((cond) => (
-                        <td>{item[cond.field] ?? "-"}</td>
+                        <td>{formatGrade(item[cond.field], item[cond.noteField])}</td>
                       ))}
                     </tr>
                   ))}
@@ -225,7 +244,15 @@ adminRoutes.get("/admin/stability/:batchId/export", async (c) => {
   const header = ["구간", ...CONDITIONS.map((cond) => cond.label)];
   const data = [
     header,
-    ...sorted.map((row) => [row.label, ...CONDITIONS.map((cond) => row[cond.field] ?? "")]),
+    ...sorted.map((row) => [
+      row.label,
+      ...CONDITIONS.map((cond) => {
+        const grade = row[cond.field];
+        if (grade == null) return "";
+        const note = row[cond.noteField];
+        return note ? `${grade} (${note})` : String(grade);
+      }),
+    ]),
   ];
 
   const worksheet = XLSX.utils.aoa_to_sheet(data);
@@ -335,29 +362,65 @@ adminRoutes.get("/ack/:id", async (c) => {
         </p>
         <p style="font-size:13px;color:#16a34a;">반복 알람이 해제되었습니다.</p>
         <form method="post" action={`/ack/${id}`}>
-          {CONDITIONS.map((cond) => (
-            <div class="row">
-              <div style="flex:1">
-                <label>{cond.label}</label>
-                <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
-                  {GRADE_LABELS.map((glabel, gvalue) => (
-                    <label style="font-weight:normal;font-size:14px;color:#1a1a1a;display:flex;align-items:center;gap:8px;cursor:pointer;">
-                      <input
-                        type="radio"
-                        name={cond.inputName}
-                        value={gvalue}
-                        required
-                        checked={schedule[cond.field] === gvalue}
-                      />
-                      {glabel}
-                    </label>
-                  ))}
+          {CONDITIONS.map((cond) => {
+            const existingNotes = (schedule[cond.noteField] ?? "").split(",").filter(Boolean);
+            const noteBoxId = `note-${cond.inputName}`;
+            const currentGrade = schedule[cond.field];
+            const showNotes = currentGrade != null && currentGrade > 0;
+            return (
+              <div class="row">
+                <div style="flex:1">
+                  <label>{cond.label}</label>
+                  <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+                    {GRADE_LABELS.map((glabel, gvalue) => (
+                      <label style="font-weight:normal;font-size:14px;color:#1a1a1a;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input
+                          type="radio"
+                          name={cond.inputName}
+                          value={gvalue}
+                          class="grade-radio"
+                          data-note-target={noteBoxId}
+                          required
+                          checked={currentGrade === gvalue}
+                        />
+                        {glabel}
+                      </label>
+                    ))}
+                  </div>
+                  <div
+                    id={noteBoxId}
+                    style={`margin-top:8px;padding:8px 12px;background:#f9fafb;border-radius:6px;${showNotes ? "" : "display:none;"}`}
+                  >
+                    <span style="font-size:12px;color:#6b7280;">특이사항 (해당 항목 선택)</span>
+                    <div style="display:flex;gap:14px;margin-top:4px;">
+                      {REASON_OPTIONS.map((reason) => (
+                        <label style="font-weight:normal;font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                          <input
+                            type="checkbox"
+                            name={cond.noteInputName}
+                            value={reason}
+                            checked={existingNotes.includes(reason)}
+                          />
+                          {reason}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           <button type="submit">저장</button>
         </form>
+        <script>{`
+          document.querySelectorAll('.grade-radio').forEach(function (radio) {
+            radio.addEventListener('change', function () {
+              var box = document.getElementById(this.getAttribute('data-note-target'));
+              if (!box) return;
+              box.style.display = this.value === '0' ? 'none' : 'block';
+            });
+          });
+        `}</script>
       </div>
     </Layout>
   );
@@ -366,13 +429,20 @@ adminRoutes.get("/ack/:id", async (c) => {
 adminRoutes.post("/ack/:id", async (c) => {
   const db = drizzle(c.env.DB);
   const id = Number(c.req.param("id"));
-  const body = await c.req.parseBody();
+  const body = await c.req.parseBody({ all: true });
 
-  const values: Record<string, number | null> = {};
+  const values: Record<string, number | string | null> = {};
   for (const cond of CONDITIONS) {
     const raw = body[cond.inputName];
     const parsed = typeof raw === "string" ? Number(raw) : NaN;
-    values[cond.field] = Number.isInteger(parsed) && parsed >= 0 && parsed <= 3 ? parsed : null;
+    const grade = Number.isInteger(parsed) && parsed >= 0 && parsed <= 3 ? parsed : null;
+    values[cond.field] = grade;
+
+    const noteRaw = body[cond.noteInputName];
+    const notes = (Array.isArray(noteRaw) ? noteRaw : noteRaw ? [noteRaw] : [])
+      .map(String)
+      .filter((n) => REASON_OPTIONS.includes(n));
+    values[cond.noteField] = grade && grade > 0 && notes.length > 0 ? notes.join(",") : null;
   }
 
   await db
