@@ -5,6 +5,8 @@ export async function sendTeamsAlarm(webhookUrl: string, title: string, message:
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       type: "message",
+      summary: title, // Teams 채팅 목록 미리보기(요약) 텍스트
+      text: title,
       attachments: [
         {
           contentType: "application/vnd.microsoft.card.adaptive",
