@@ -24,13 +24,14 @@ export async function runDueAlarms(env: Env) {
   );
 
   for (const schedule of due) {
+    const title = `[안정도 관리] ${schedule.productName}`;
     const message = `Lab No. ${schedule.labNo}\n\n안정도를 확인하세요 (${schedule.label} 경과)`;
 
     // 채널 + 개인 채팅 둘 다 발송. 하나라도 성공하면 재발송을 막기 위해
     // sent = true로 표시하고, 실패한 웹훅이 있으면 로그에 남깁니다.
     const results = await Promise.allSettled([
-      sendTeamsAlarm(env.TEAMS_WEBHOOK_URL, schedule.productName, message),
-      sendTeamsAlarm(env.TEAMS_WEBHOOK_URL_DM, schedule.productName, message),
+      sendTeamsAlarm(env.TEAMS_WEBHOOK_URL, title, message),
+      sendTeamsAlarm(env.TEAMS_WEBHOOK_URL_DM, title, message),
     ]);
     const failures = results.filter(
       (r): r is PromiseRejectedResult => r.status === "rejected"
