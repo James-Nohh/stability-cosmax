@@ -27,6 +27,20 @@ export const stabilitySchedules = sqliteTable("stability_schedules", {
   targetMinute: integer("target_minute").notNull(), // 0-59 (KST)
   label: text("label").notNull(), // '1일', '1주', '2주', '1개월', '2개월', '3개월'
   sent: integer("sent", { mode: "boolean" }).notNull().default(false),
+
+  // 미확인 시 반복 알람: 최초 발송 후 20분 간격으로 3회(1시간), 이후 6시간마다
+  // 같은 패턴을 무한 반복합니다. "안정도 확인"/"나중에" 클릭으로 해제됩니다.
+  nextReminderAt: integer("next_reminder_at"), // unix ms, 다음 재알림 예정 시각
+  burstReminderCount: integer("burst_reminder_count").notNull().default(0), // 현재 버스트 내 재알림 횟수(0~3)
+  acknowledgedAt: integer("acknowledged_at"), // unix ms, "안정도 확인" 클릭 시각(설정되면 재알림 중단)
+
+  // "안정도 확인" 클릭 후 입력하는 조건별 등급 (0=적합, 1=적합·특이사항, 2=조건부 적합, 3=부적합)
+  gradeC4: integer("grade_4c"),
+  gradeC25: integer("grade_25c"),
+  gradeC37: integer("grade_37c"),
+  gradeC45: integer("grade_45c"),
+  gradeSunlight: integer("grade_sunlight"),
+
   createdAt: text("created_at").notNull().default("CURRENT_TIMESTAMP"),
 });
 

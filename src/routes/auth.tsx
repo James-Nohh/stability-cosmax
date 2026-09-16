@@ -10,14 +10,20 @@ import type { Env, Variables } from "../types";
 
 export const authRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
+function safeRedirect(path: unknown): string {
+  return typeof path === "string" && path.startsWith("/") && !path.startsWith("//") ? path : "/admin";
+}
+
 authRoutes.get("/login", (c) => {
   const error = c.req.query("error");
+  const redirect = safeRedirect(c.req.query("redirect"));
   return c.html(
     <Layout title="로그인" showNav={false}>
       <div class="card" style="max-width: 360px; margin: 60px auto;">
         <h2>로그인</h2>
         {error && <p class="error">아이디 또는 비밀번호가 올바르지 않습니다.</p>}
         <form method="post" action="/login">
+          <input type="hidden" name="redirect" value={redirect} />
           <div class="row">
             <div style="flex:1">
               <label>아이디</label>
@@ -41,12 +47,13 @@ authRoutes.post("/login", async (c) => {
   const body = await c.req.parseBody();
   const username = String(body.username ?? "");
   const password = String(body.password ?? "");
+  const redirect = safeRedirect(body.redirect);
 
   const db = drizzle(c.env.DB);
   const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1);
 
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
-    return c.redirect("/login?error=1");
+    return c.redirect(`/login?error=1&redirect=${encodeURIComponent(redirect)}`);
   }
 
   const token = await createSession(db, user.id);
@@ -57,7 +64,7 @@ authRoutes.post("/login", async (c) => {
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
-  return c.redirect("/admin");
+  return c.redirect(redirect);
 });
 
 authRoutes.post("/logout", async (c) => {

@@ -1,7 +1,15 @@
-const ADMIN_URL = "https://stability-admin.stability-cosmax.workers.dev/admin";
+const ADMIN_BASE = "https://stability-admin.stability-cosmax.workers.dev";
 
 // Power Automate "웹훅 요청을 받으면 채널에 게시" 워크플로로 Adaptive Card를 전송합니다.
-export async function sendTeamsAlarm(webhookUrl: string, title: string, message: string) {
+export async function sendTeamsAlarm(
+  webhookUrl: string,
+  title: string,
+  message: string,
+  scheduleId: number
+) {
+  const ackUrl = `${ADMIN_BASE}/ack/${scheduleId}`;
+  const snoozeUrl = `${ADMIN_BASE}/snooze/${scheduleId}`;
+
   const res = await fetch(webhookUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -21,16 +29,15 @@ export async function sendTeamsAlarm(webhookUrl: string, title: string, message:
               { type: "TextBlock", text: message, wrap: true },
               {
                 type: "TextBlock",
-                id: "laterNote",
-                text: "확인이 필요하시면 안정도 관리 화면에서 다시 확인해주세요.",
+                text: "버튼 클릭 시 알람 해제",
                 wrap: true,
                 isSubtle: true,
-                isVisible: false,
+                size: "Small",
               },
             ],
             actions: [
-              { type: "Action.OpenUrl", title: "안정도 확인", url: ADMIN_URL },
-              { type: "Action.ToggleVisibility", title: "나중에", targetElements: ["laterNote"] },
+              { type: "Action.OpenUrl", title: "안정도 확인", url: ackUrl },
+              { type: "Action.OpenUrl", title: "나중에", url: snoozeUrl },
             ],
           },
         },

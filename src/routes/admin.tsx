@@ -20,6 +20,29 @@ const CHECKPOINTS: { label: string; addDays?: number; addMonths?: number }[] = [
   { label: "3개월", addMonths: 3 },
 ];
 
+const GRADE_LABELS = [
+  "0 - 적합",
+  "1 - 적합. 특이사항 있음",
+  "2 - 조건부 적합. 고객사 안내 및 안정도 확인 필요",
+  "3 - 부적합",
+];
+
+const CONDITIONS = [
+  { field: "gradeC4", inputName: "grade4c", label: "4℃" },
+  { field: "gradeC25", inputName: "grade25c", label: "25℃" },
+  { field: "gradeC37", inputName: "grade37c", label: "37℃" },
+  { field: "gradeC45", inputName: "grade45c", label: "45℃" },
+  { field: "gradeSunlight", inputName: "gradeSunlight", label: "일광" },
+] as const satisfies { field: keyof typeof stabilitySchedules.$inferSelect; inputName: string; label: string }[];
+
+const SNOOZE_OPTIONS = [
+  { minutes: 30, label: "30분 뒤" },
+  { minutes: 60, label: "1시간 뒤" },
+  { minutes: 120, label: "2시간 뒤" },
+  { minutes: 180, label: "3시간 뒤" },
+  { minutes: 240, label: "4시간 뒤" },
+];
+
 adminRoutes.get("/admin", async (c) => {
   const db = drizzle(c.env.DB);
   const rows = await db.select().from(stabilitySchedules).orderBy(stabilitySchedules.id);
@@ -204,6 +227,159 @@ adminRoutes.get("/admin/logs", async (c) => {
             ))}
           </tbody>
         </table>
+      </div>
+    </Layout>
+  );
+});
+
+adminRoutes.get("/ack/:id", async (c) => {
+  const db = drizzle(c.env.DB);
+  const id = Number(c.req.param("id"));
+  const [schedule] = await db
+    .select()
+    .from(stabilitySchedules)
+    .where(eq(stabilitySchedules.id, id))
+    .limit(1);
+
+  if (!schedule) {
+    return c.html(
+      <Layout title="안정도 확인">
+        <div class="card">존재하지 않는 알람입니다.</div>
+      </Layout>
+    );
+  }
+
+  if (!schedule.acknowledgedAt) {
+    await db
+      .update(stabilitySchedules)
+      .set({ acknowledgedAt: Date.now() })
+      .where(eq(stabilitySchedules.id, id));
+  }
+
+  return c.html(
+    <Layout title="안정도 확인">
+      <div class="card">
+        <h2>안정도 확인</h2>
+        <p>
+          <strong>{schedule.productName}</strong> · Lab No. {schedule.labNo} · {schedule.label} 경과
+        </p>
+        <p style="font-size:13px;color:#16a34a;">반복 알람이 해제되었습니다.</p>
+        <form method="post" action={`/ack/${id}`}>
+          {CONDITIONS.map((cond) => (
+            <div class="row">
+              <div style="flex:1">
+                <label>{cond.label}</label>
+                <select name={cond.inputName} required style="width:100%">
+                  <option value="" disabled selected={schedule[cond.field] == null}>
+                    선택하세요
+                  </option>
+                  {GRADE_LABELS.map((glabel, gvalue) => (
+                    <option value={gvalue} selected={schedule[cond.field] === gvalue}>
+                      {glabel}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ))}
+          <button type="submit">저장</button>
+        </form>
+      </div>
+    </Layout>
+  );
+});
+
+adminRoutes.post("/ack/:id", async (c) => {
+  const db = drizzle(c.env.DB);
+  const id = Number(c.req.param("id"));
+  const body = await c.req.parseBody();
+
+  const values: Record<string, number | null> = {};
+  for (const cond of CONDITIONS) {
+    const raw = body[cond.inputName];
+    const parsed = typeof raw === "string" ? Number(raw) : NaN;
+    values[cond.field] = Number.isInteger(parsed) && parsed >= 0 && parsed <= 3 ? parsed : null;
+  }
+
+  await db
+    .update(stabilitySchedules)
+    .set({ ...values, acknowledgedAt: Date.now() })
+    .where(eq(stabilitySchedules.id, id));
+
+  return c.html(
+    <Layout title="저장 완료">
+      <div class="card">
+        <h2>저장되었습니다</h2>
+        <p>
+          <a href="/admin">안정도 관리로 돌아가기</a>
+        </p>
+      </div>
+    </Layout>
+  );
+});
+
+adminRoutes.get("/snooze/:id", async (c) => {
+  const db = drizzle(c.env.DB);
+  const id = Number(c.req.param("id"));
+  const [schedule] = await db
+    .select()
+    .from(stabilitySchedules)
+    .where(eq(stabilitySchedules.id, id))
+    .limit(1);
+
+  if (!schedule) {
+    return c.html(
+      <Layout title="나중에">
+        <div class="card">존재하지 않는 알람입니다.</div>
+      </Layout>
+    );
+  }
+
+  return c.html(
+    <Layout title="나중에">
+      <div class="card">
+        <h2>나중에 다시 알림</h2>
+        <p>
+          <strong>{schedule.productName}</strong> · Lab No. {schedule.labNo} · {schedule.label} 경과
+        </p>
+        <p>언제 다시 알려드릴까요?</p>
+        <div class="row">
+          {SNOOZE_OPTIONS.map((opt) => (
+            <form method="post" action={`/snooze/${id}`} class="inline">
+              <input type="hidden" name="minutes" value={opt.minutes} />
+              <button type="submit" class="secondary">
+                {opt.label}
+              </button>
+            </form>
+          ))}
+        </div>
+      </div>
+    </Layout>
+  );
+});
+
+adminRoutes.post("/snooze/:id", async (c) => {
+  const db = drizzle(c.env.DB);
+  const id = Number(c.req.param("id"));
+  const body = await c.req.parseBody();
+  const allowed = new Set(SNOOZE_OPTIONS.map((o) => o.minutes));
+  const minutes = Number(body.minutes);
+
+  if (allowed.has(minutes)) {
+    await db
+      .update(stabilitySchedules)
+      .set({ nextReminderAt: Date.now() + minutes * 60 * 1000, burstReminderCount: 0 })
+      .where(eq(stabilitySchedules.id, id));
+  }
+
+  return c.html(
+    <Layout title="나중에">
+      <div class="card">
+        <h2>알겠습니다</h2>
+        <p>{minutes}분 후 다시 알려드리겠습니다.</p>
+        <p>
+          <a href="/admin">안정도 관리로 돌아가기</a>
+        </p>
       </div>
     </Layout>
   );

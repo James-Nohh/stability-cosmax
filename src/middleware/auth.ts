@@ -10,7 +10,8 @@ export const requireAuth = createMiddleware<{ Bindings: Env; Variables: Variable
     const token = getCookie(c, "session");
     const user = await getUserBySession(db, token);
     if (!user) {
-      return c.redirect("/login");
+      const redirect = encodeURIComponent(c.req.path);
+      return c.redirect(`/login?redirect=${redirect}`);
     }
     c.set("user", user);
     await next();
