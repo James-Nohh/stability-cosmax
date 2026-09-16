@@ -62,7 +62,8 @@ adminRoutes.get("/admin", async (c) => {
         </form>
         <p style="font-size:13px;color:#6b7280;margin-top:10px;">
           클릭한 시각(KST) 기준으로 1일 / 1주 / 2주 / 1개월 / 2개월 / 3개월 후 같은 시각에
-          Teams로 알람이 예약됩니다.
+          Teams로 알람이 예약됩니다. 단, 오후 5시 이후 클릭하면 다음 날 오전 8시를 기준으로
+          계산됩니다.
         </p>
       </div>
 
@@ -123,18 +124,25 @@ adminRoutes.post("/admin/stability", async (c) => {
   }
 
   const batchId = crypto.randomUUID();
-  const today = kstTodayDateOnly();
   const { hour, minute } = nowKst();
 
+  // 오후 5시(17시) 이후 시작하면 다음 날 오전 8시를 기준일로 삼습니다.
+  const LATE_HOUR = 17;
+  const isLate = hour >= LATE_HOUR;
+  const baseDate = isLate ? addDays(kstTodayDateOnly(), 1) : kstTodayDateOnly();
+  const targetHour = isLate ? 8 : hour;
+  const targetMinute = isLate ? 0 : minute;
+
   const values = CHECKPOINTS.map((cp) => {
-    const target = cp.addDays !== undefined ? addDays(today, cp.addDays) : addMonths(today, cp.addMonths!);
+    const target =
+      cp.addDays !== undefined ? addDays(baseDate, cp.addDays) : addMonths(baseDate, cp.addMonths!);
     return {
       batchId,
       productName,
       labNo,
       targetDate: formatDateStr(target),
-      targetHour: hour,
-      targetMinute: minute,
+      targetHour,
+      targetMinute,
       label: cp.label,
       sent: false,
     };
