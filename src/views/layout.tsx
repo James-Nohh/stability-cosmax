@@ -31,6 +31,7 @@ export const Layout: FC<PropsWithChildren<{ title: string; showNav?: boolean }>>
         .badge { padding: 2px 8px; border-radius: 999px; font-size: 12px; }
         .badge.on { background: #dcfce7; color: #166534; }
         .badge.off { background: #f3f4f6; color: #6b7280; }
+        .scroll-x { overflow-x: auto; }
       `}</style>
     </head>
     <body>

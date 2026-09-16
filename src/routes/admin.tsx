@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { drizzle } from "drizzle-orm/d1";
 import { eq, desc } from "drizzle-orm";
+import * as XLSX from "xlsx";
 import { stabilitySchedules, batchLogs } from "../db/schema";
 import { requireAuth } from "../middleware/auth";
 import { Layout } from "../views/layout";
@@ -45,6 +46,7 @@ const SNOOZE_OPTIONS = [
 
 adminRoutes.get("/admin", async (c) => {
   const db = drizzle(c.env.DB);
+  const labNoQuery = (c.req.query("labNo") ?? "").trim();
   const rows = await db.select().from(stabilitySchedules).orderBy(stabilitySchedules.id);
 
   const batches = new Map<
@@ -62,7 +64,12 @@ adminRoutes.get("/admin", async (c) => {
     }
     batches.get(row.batchId)!.items.push(row);
   }
-  const batchList = [...batches.entries()].reverse();
+  let batchList = [...batches.entries()].reverse();
+  if (labNoQuery) {
+    batchList = batchList.filter(([, batch]) =>
+      batch.labNo.toLowerCase().includes(labNoQuery.toLowerCase())
+    );
+  }
 
   return c.html(
     <Layout title="안정도 관리">
@@ -91,7 +98,16 @@ adminRoutes.get("/admin", async (c) => {
 
       <div class="card">
         <h2>등록된 안정도</h2>
-        {batchList.length === 0 && <p>등록된 안정도가 없습니다.</p>}
+        <form method="get" action="/admin" class="row">
+          <div style="flex:1">
+            <label>Lab No. 검색</label>
+            <input type="text" name="labNo" value={labNoQuery} placeholder="Lab No. 입력" style="width:100%" />
+          </div>
+          <div style="display:flex;align-items:flex-end;">
+            <button type="submit">검색</button>
+          </div>
+        </form>
+        {batchList.length === 0 && <p>{labNoQuery ? "검색 결과가 없습니다." : "등록된 안정도가 없습니다."}</p>}
         {batchList.map(([batchId, batch]) => (
           <div style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
@@ -99,35 +115,51 @@ adminRoutes.get("/admin", async (c) => {
                 <strong>{batch.productName}</strong>{" "}
                 <span style="color:#6b7280;">· Lab No. {batch.labNo}</span>
               </div>
-              <form method="post" action={`/admin/stability/${batchId}/delete`}>
-                <button type="submit" class="danger">삭제</button>
-              </form>
+              <div style="display:flex;gap:8px;">
+                <a
+                  href={`/admin/stability/${batchId}/export`}
+                  style="background:#6b7280;color:#fff;border:none;border-radius:4px;padding:8px 12px;font-size:14px;text-decoration:none;"
+                >
+                  엑셀 다운로드
+                </a>
+                <form method="post" action={`/admin/stability/${batchId}/delete`}>
+                  <button type="submit" class="danger">삭제</button>
+                </form>
+              </div>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>구간</th>
-                  <th>예정 시각(KST)</th>
-                  <th>상태</th>
-                </tr>
-              </thead>
-              <tbody>
-                {batch.items.map((item) => (
+            <div class="scroll-x">
+              <table>
+                <thead>
                   <tr>
-                    <td>{item.label}</td>
-                    <td>
-                      {item.targetDate} {String(item.targetHour).padStart(2, "0")}:
-                      {String(item.targetMinute).padStart(2, "0")}
-                    </td>
-                    <td>
-                      <span class={`badge ${item.sent ? "on" : "off"}`}>
-                        {item.sent ? "발송완료" : "대기"}
-                      </span>
-                    </td>
+                    <th>구간</th>
+                    <th>예정 시각(KST)</th>
+                    <th>상태</th>
+                    {CONDITIONS.map((cond) => (
+                      <th>{cond.label}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {batch.items.map((item) => (
+                    <tr>
+                      <td>{item.label}</td>
+                      <td>
+                        {item.targetDate} {String(item.targetHour).padStart(2, "0")}:
+                        {String(item.targetMinute).padStart(2, "0")}
+                      </td>
+                      <td>
+                        <span class={`badge ${item.sent ? "on" : "off"}`}>
+                          {item.sent ? "발송완료" : "대기"}
+                        </span>
+                      </td>
+                      {CONDITIONS.map((cond) => (
+                        <td>{item[cond.field] ?? "-"}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ))}
       </div>
@@ -173,6 +205,44 @@ adminRoutes.post("/admin/stability/:batchId/delete", async (c) => {
   const batchId = c.req.param("batchId");
   await db.delete(stabilitySchedules).where(eq(stabilitySchedules.batchId, batchId));
   return c.redirect("/admin");
+});
+
+adminRoutes.get("/admin/stability/:batchId/export", async (c) => {
+  const db = drizzle(c.env.DB);
+  const batchId = c.req.param("batchId");
+  const rows = await db
+    .select()
+    .from(stabilitySchedules)
+    .where(eq(stabilitySchedules.batchId, batchId));
+
+  if (rows.length === 0) {
+    return c.text("존재하지 않는 안정도입니다.", 404);
+  }
+
+  const order = CHECKPOINTS.map((cp) => cp.label);
+  const sorted = [...rows].sort((a, b) => order.indexOf(a.label) - order.indexOf(b.label));
+
+  const header = ["구간", ...CONDITIONS.map((cond) => cond.label)];
+  const data = [
+    header,
+    ...sorted.map((row) => [row.label, ...CONDITIONS.map((cond) => row[cond.field] ?? "")]),
+  ];
+
+  const worksheet = XLSX.utils.aoa_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "안정도");
+
+  const buffer = XLSX.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+
+  const { productName, labNo } = rows[0];
+  const filename = `안정도_${productName}_${labNo}.xlsx`.replace(/[\\/:*?"<>|]/g, "_");
+
+  return new Response(buffer, {
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="stability.xlsx"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    },
+  });
 });
 
 adminRoutes.get("/admin/logs", async (c) => {
@@ -269,16 +339,20 @@ adminRoutes.get("/ack/:id", async (c) => {
             <div class="row">
               <div style="flex:1">
                 <label>{cond.label}</label>
-                <select name={cond.inputName} required style="width:100%">
-                  <option value="" disabled selected={schedule[cond.field] == null}>
-                    선택하세요
-                  </option>
+                <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
                   {GRADE_LABELS.map((glabel, gvalue) => (
-                    <option value={gvalue} selected={schedule[cond.field] === gvalue}>
+                    <label style="font-weight:normal;font-size:14px;color:#1a1a1a;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                      <input
+                        type="radio"
+                        name={cond.inputName}
+                        value={gvalue}
+                        required
+                        checked={schedule[cond.field] === gvalue}
+                      />
                       {glabel}
-                    </option>
+                    </label>
                   ))}
-                </select>
+                </div>
               </div>
             </div>
           ))}
