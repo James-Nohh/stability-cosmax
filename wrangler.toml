@@ -3,9 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
 
-# 5분마다 실행 — 예정일이 지났고 아직 발송 안 된 안정도 알람을 찾아 발송합니다.
+# 매 분 실행 — 예정일이 지났고 아직 발송 안 된 안정도 알람을 찾아 발송합니다.
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["* * * * *"]
 
 [[d1_databases]]
 binding = "DB"
