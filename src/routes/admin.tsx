@@ -154,24 +154,22 @@ function renderEditFieldsets(rows: Schedule[]) {
           <div class="row" style="border-top:1px solid #e5e7eb;padding-top:10px;margin-top:10px;">
             <div style="flex:1">
               <label>{cond.label}</label>
-              <div style="display:flex;gap:28px;margin-top:6px;flex-wrap:wrap;">
+              <div style="display:flex;gap:20px;margin-top:6px;flex-wrap:wrap;align-items:flex-start;">
                 <div>
-                  <span style="font-size:12px;color:#6b7280;">Appearance (외관)</span>
-                  <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
-                    {GRADE_LABELS.map((glabel, gvalue) => (
-                      <label style="font-weight:normal;font-size:14px;color:#1a1a1a;display:flex;align-items:center;gap:8px;cursor:pointer;">
-                        <input
-                          type="radio"
-                          name={`${row.id}_${cond.appearanceInputName}`}
-                          value={gvalue}
-                          class="grade-radio"
-                          data-note-target={noteBoxId}
-                          checked={currentAppearance === gvalue}
-                        />
-                        {glabel}
-                      </label>
-                    ))}
-                  </div>
+                  <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">
+                    Appearance (외관, 0~3)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="3"
+                    step="1"
+                    name={`${row.id}_${cond.appearanceInputName}`}
+                    value={currentAppearance ?? ""}
+                    class="grade-input"
+                    data-note-target={noteBoxId}
+                    style="width:70px"
+                  />
                   <div
                     id={noteBoxId}
                     style={`margin-top:8px;padding:8px 12px;background:#f9fafb;border-radius:6px;${showNotes ? "" : "display:none;"}`}
@@ -193,20 +191,18 @@ function renderEditFieldsets(rows: Schedule[]) {
                   </div>
                 </div>
                 <div>
-                  <span style="font-size:12px;color:#6b7280;">Odor (냄새)</span>
-                  <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
-                    {GRADE_LABELS.map((glabel, gvalue) => (
-                      <label style="font-weight:normal;font-size:14px;color:#1a1a1a;display:flex;align-items:center;gap:8px;cursor:pointer;">
-                        <input
-                          type="radio"
-                          name={`${row.id}_${cond.odorInputName}`}
-                          value={gvalue}
-                          checked={currentOdor === gvalue}
-                        />
-                        {glabel}
-                      </label>
-                    ))}
-                  </div>
+                  <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">
+                    Odor (냄새, 0~3)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="3"
+                    step="1"
+                    name={`${row.id}_${cond.odorInputName}`}
+                    value={currentOdor ?? ""}
+                    style="width:70px"
+                  />
                 </div>
               </div>
               {cond.isC25 && (
@@ -483,11 +479,12 @@ adminRoutes.get("/admin", async (c) => {
               }
             });
 
-            batchList.addEventListener('change', function (e) {
-              if (!e.target.classList || !e.target.classList.contains('grade-radio')) return;
+            batchList.addEventListener('input', function (e) {
+              if (!e.target.classList || !e.target.classList.contains('grade-input')) return;
               var box = document.getElementById(e.target.getAttribute('data-note-target'));
               if (!box) return;
-              box.style.display = e.target.value === '0' ? 'none' : 'block';
+              var n = parseInt(e.target.value, 10);
+              box.style.display = n >= 1 && n <= 3 ? 'block' : 'none';
             });
 
             batchList.addEventListener('submit', function (e) {
