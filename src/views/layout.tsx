@@ -24,11 +24,12 @@ export const Layout: FC<PropsWithChildren<{ title: string; showNav?: boolean }>>
         table.stability-table { table-layout: fixed; }
         table.stability-table th, table.stability-table td { padding: 6px 4px; word-break: keep-all; }
         input, button { font-size: 14px; padding: 8px; border-radius: 4px; border: 1px solid #d1d5db; }
-        button { height: 36px; background: #2563eb; color: #fff; border: none; cursor: pointer; }
+        button { height: 36px; background: #2563eb; color: #fff; border: none; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
         button.danger { background: #dc2626; }
         button.secondary { background: #6b7280; }
-        a.btn-excel { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; height: 36px; padding: 0 12px; border-radius: 4px; border: none; background: #217346; color: #fff; font-size: 14px; text-decoration: none; }
-        a.btn-edit { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; height: 36px; padding: 0 12px; border-radius: 4px; border: none; background: #2563eb; color: #fff; font-size: 14px; text-decoration: none; }
+        a.btn-excel, a.btn-edit { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; height: 36px; padding: 0 10px; border-radius: 4px; border: none; font-size: 14px; text-decoration: none; white-space: nowrap; flex-shrink: 0; }
+        a.btn-excel { background: #217346; color: #fff; }
+        a.btn-edit { background: #f59e0b; color: #fff; }
         fieldset { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
         fieldset legend { font-weight: 600; padding: 0 6px; }
         form.inline { display: inline; }
