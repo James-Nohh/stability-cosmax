@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { drizzle } from "drizzle-orm/d1";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 import { raw } from "hono/utils/html";
 import { stabilitySchedules, batchLogs } from "../db/schema";
 import { requireAuth } from "../middleware/auth";
@@ -386,7 +386,20 @@ adminRoutes.post("/admin/stability", async (c) => {
 adminRoutes.post("/admin/stability/:batchId/delete", async (c) => {
   const db = drizzle(c.env.DB);
   const batchId = c.req.param("batchId");
+
+  const rows = await db
+    .select({ id: stabilitySchedules.id })
+    .from(stabilitySchedules)
+    .where(eq(stabilitySchedules.batchId, batchId));
+  const scheduleIds = rows.map((r) => r.id);
+
+  // batch_logs가 stability_schedules.id를 참조하므로(FK), 먼저 로그부터 지워야
+  // 실제 알람이 한 번이라도 발송된 배치의 삭제가 FK 제약 위반으로 실패하지 않습니다.
+  if (scheduleIds.length > 0) {
+    await db.delete(batchLogs).where(inArray(batchLogs.scheduleId, scheduleIds));
+  }
   await db.delete(stabilitySchedules).where(eq(stabilitySchedules.batchId, batchId));
+
   return c.redirect("/admin");
 });
 
