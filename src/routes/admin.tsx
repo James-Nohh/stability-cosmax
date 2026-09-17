@@ -240,7 +240,7 @@ adminRoutes.get("/admin", async (c) => {
         {batchList.map(([batchId, batch]) => {
           const inProgress = batch.items.some((item) => item.label !== "0일" && !item.acknowledgedAt);
           return (
-          <div style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px;">
+          <div class="stability-batch-card" style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
               <div>
                 <strong>{batch.productName}</strong>{" "}
@@ -251,12 +251,11 @@ adminRoutes.get("/admin", async (c) => {
                   엑셀 다운로드
                 </a>
                 <form
+                  class="delete-form"
                   method="post"
                   action={`/admin/stability/${batchId}/delete`}
-                  onsubmit={
-                    inProgress
-                      ? "return confirm('아직 안정도 확인이 진행 중인 항목입니다. 정말 삭제하시겠습니까?');"
-                      : undefined
+                  data-confirm={
+                    inProgress ? "아직 안정도 확인이 진행 중인 항목입니다. 정말 삭제하시겠습니까?" : ""
                   }
                 >
                   <button type="submit" class="danger">삭제</button>
@@ -326,6 +325,26 @@ adminRoutes.get("/admin", async (c) => {
           </div>
           );
         })}
+        <script>
+          {raw(`
+          document.querySelectorAll('.delete-form').forEach(function (form) {
+            form.addEventListener('submit', function (e) {
+              e.preventDefault();
+              var msg = form.getAttribute('data-confirm');
+              if (msg && !confirm(msg)) return;
+              fetch(form.action, { method: 'POST' })
+                .then(function (res) {
+                  if (!res.ok) throw new Error('delete failed');
+                  var card = form.closest('.stability-batch-card');
+                  if (card) card.remove();
+                })
+                .catch(function () {
+                  alert('삭제에 실패했습니다. 다시 시도해주세요.');
+                });
+            });
+          });
+        `)}
+        </script>
       </div>
     </Layout>
   );
