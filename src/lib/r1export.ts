@@ -102,11 +102,12 @@ function setGradeCell(cell: ExcelJS.Cell, grade: number | null, note: string | n
 
 export async function buildR1Workbook(batchRows: Schedule[], user: User): Promise<ExcelJS.Buffer> {
   const workbook = new ExcelJS.Workbook();
+  // assets/r1-template.xlsx는 원본(여러 카테고리 시트 + 이미지가 있던, 200KB대) 파일에서
+  // R1 시트만 남기고 이미지도 미리 제거해 둔 버전입니다(빌드 타임에 1회 처리).
+  // Cloudflare Workers 요청마다 원본 전체를 파싱하면 CPU 한도를 넘기기 쉬워서,
+  // 매 요청마다 하던 시트 정리/이미지 제거 작업을 미리 끝내 둔 파일을 사용합니다.
   await workbook.xlsx.load(r1Template as ArrayBuffer);
 
-  for (const sheet of [...workbook.worksheets]) {
-    if (sheet.name !== "R1") workbook.removeWorksheet(sheet.id);
-  }
   const ws = workbook.getWorksheet("R1");
   if (!ws) throw new Error("R1 시트를 찾을 수 없습니다.");
 
