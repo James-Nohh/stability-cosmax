@@ -109,18 +109,23 @@ function segmentLabel(label: string): string {
   return SEGMENT_LABELS[label] ?? label;
 }
 
+const ALERT_GRADES = new Set([2, 3]);
+
 function renderGrade(grade: number | null, note: string | null) {
   if (grade == null) return "-";
-  if (!note) return String(grade);
+  const alert = ALERT_GRADES.has(grade);
+  if (!note) return alert ? <span style="color:#dc2626;">{grade}</span> : String(grade);
   return (
-    <>
-      {grade} <span style="font-size:11px;color:#9ca3af;">({note})</span>
-    </>
+    <span style={alert ? "color:#dc2626;" : undefined}>
+      {grade}{" "}
+      <span style={`font-size:11px;${alert ? "color:#dc2626;" : "color:#9ca3af;"}`}>({note})</span>
+    </span>
   );
 }
 
-function formatOdor(grade: number | null): string {
-  return grade == null ? "-" : String(grade);
+function renderOdor(grade: number | null) {
+  if (grade == null) return "-";
+  return ALERT_GRADES.has(grade) ? <span style="color:#dc2626;">{grade}</span> : String(grade);
 }
 
 function renderExtra25(ph: string | null, viscosity: string | null, specificGravity: string | null) {
@@ -269,7 +274,7 @@ adminRoutes.get("/admin", async (c) => {
                           </div>
                           <div>
                             <span style="font-size:11px;color:#6b7280;">냄새</span>{" "}
-                            {formatOdor(item[cond.odorField])}
+                            {renderOdor(item[cond.odorField])}
                           </div>
                           {cond.isC25 && renderExtra25(item.ph25c, item.viscosity25c, item.specificGravity25c)}
                         </td>
