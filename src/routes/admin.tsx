@@ -60,8 +60,12 @@ function formatGrade(grade: number | null, note: string | null): string {
   return gradeNoteText(grade, note) ?? "-";
 }
 
-function ph25Text(ph: string | null, viscosity: string | null): string | null {
-  const parts = [ph && `pH ${ph}`, viscosity && `점(경)도 ${viscosity}`].filter(Boolean) as string[];
+function extra25Text(ph: string | null, viscosity: string | null, specificGravity: string | null): string | null {
+  const parts = [
+    ph && `pH ${ph}`,
+    specificGravity && `비중 ${specificGravity}`,
+    viscosity && `점(경)도 ${viscosity}`,
+  ].filter(Boolean) as string[];
   return parts.length ? parts.join(", ") : null;
 }
 
@@ -117,11 +121,26 @@ adminRoutes.get("/admin", async (c) => {
               <input type="text" name="labNo" required style="width:100%" />
             </div>
           </div>
+          <div class="row">
+            <div>
+              <label>pH</label>
+              <input type="text" name="ph0" style="width:80px" />
+            </div>
+            <div>
+              <label>점(경)도</label>
+              <input type="text" name="viscosity0" style="width:80px" />
+            </div>
+            <div>
+              <label>Specific gravity</label>
+              <input type="text" name="specificGravity0" style="width:80px" />
+            </div>
+          </div>
           <button type="submit">안정도 시작</button>
         </form>
         <p style="font-size:13px;color:#6b7280;margin-top:10px;">
           클릭한 시각(KST) 기준으로 1일 / 1주 / 2주 / 1개월 / 2개월 / 3개월 후 같은 시각에
-          Teams로 알람이 예약됩니다.
+          Teams로 알람이 예약됩니다. pH/점(경)도/Specific gravity는 0일(시작 시점) 측정값으로,
+          입력하지 않으면 빈 칸으로 남습니다.
         </p>
       </div>
 
@@ -181,11 +200,12 @@ adminRoutes.get("/admin", async (c) => {
                       {CONDITIONS.map((cond) => (
                         <td>
                           {formatGrade(item[cond.field], item[cond.noteField])}
-                          {cond.field === "gradeC25" && ph25Text(item.ph25c, item.viscosity25c) && (
-                            <div style="font-size:11px;color:#6b7280;">
-                              {ph25Text(item.ph25c, item.viscosity25c)}
-                            </div>
-                          )}
+                          {cond.field === "gradeC25" &&
+                            extra25Text(item.ph25c, item.viscosity25c, item.specificGravity25c) && (
+                              <div style="font-size:11px;color:#6b7280;">
+                                {extra25Text(item.ph25c, item.viscosity25c, item.specificGravity25c)}
+                              </div>
+                            )}
                         </td>
                       ))}
                     </tr>
@@ -219,6 +239,9 @@ adminRoutes.post("/admin/stability", async (c) => {
   const body = await c.req.parseBody();
   const productName = String(body.productName ?? "").trim();
   const labNo = String(body.labNo ?? "").trim();
+  const ph0 = String(body.ph0 ?? "").trim();
+  const viscosity0 = String(body.viscosity0 ?? "").trim();
+  const specificGravity0 = String(body.specificGravity0 ?? "").trim();
 
   if (!productName || !labNo) {
     return c.redirect("/admin");
@@ -227,6 +250,28 @@ adminRoutes.post("/admin/stability", async (c) => {
   const batchId = crypto.randomUUID();
   const today = kstTodayDateOnly();
   const { hour, minute } = nowKst();
+  const now = Date.now();
+
+  // 0일(시작 시점) — 모든 조건 등급을 0(적합)으로 자동 기록, 알람 대상 아님(sent/acknowledged 처리 완료).
+  const dayZero = {
+    batchId,
+    productName,
+    labNo,
+    targetDate: formatDateStr(today),
+    targetHour: hour,
+    targetMinute: minute,
+    label: "0일",
+    sent: true,
+    acknowledgedAt: now,
+    gradeC4: 0,
+    gradeC25: 0,
+    gradeC37: 0,
+    gradeC45: 0,
+    gradeSunlight: 0,
+    ph25c: ph0 || null,
+    viscosity25c: viscosity0 || null,
+    specificGravity25c: specificGravity0 || null,
+  };
 
   const values = CHECKPOINTS.map((cp) => {
     const target = cp.addDays !== undefined ? addDays(today, cp.addDays) : addMonths(today, cp.addMonths!);
@@ -242,7 +287,7 @@ adminRoutes.post("/admin/stability", async (c) => {
     };
   });
 
-  await db.insert(stabilitySchedules).values(values);
+  await db.insert(stabilitySchedules).values([dayZero, ...values]);
 
   return c.redirect("/admin");
 });

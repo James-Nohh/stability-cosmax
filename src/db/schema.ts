@@ -49,9 +49,10 @@ export const stabilitySchedules = sqliteTable("stability_schedules", {
   noteC45: text("note_45c"),
   noteSunlight: text("note_sunlight"),
 
-  // 25℃ 항목 전용 추가 측정값
+  // 25℃ 항목 전용 추가 측정값. specificGravity25c는 "0일"(안정도 시작 시점) 행에만 입력됩니다.
   ph25c: text("ph_25c"),
   viscosity25c: text("viscosity_25c"),
+  specificGravity25c: text("specific_gravity_25c"),
 
   // R1 엑셀 양식 Conclusion란에 들어갈 한 줄 평. 배치(batchId) 내 모든 행에 동일하게 저장됩니다.
   conclusion: text("conclusion"),
