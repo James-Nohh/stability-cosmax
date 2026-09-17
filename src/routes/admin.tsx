@@ -53,7 +53,12 @@ const REASON_OPTIONS = ["분리", "변색", "변취"];
 
 function gradeNoteText(grade: number | null, note: string | null): string | null {
   if (grade == null) return null;
-  return note ? `${grade} (${note})` : String(grade);
+  // '변취'는 표시하지 않음 (Odor는 숫자만 노출)
+  const visible = (note ?? "")
+    .split(",")
+    .filter((r) => r && r !== "변취")
+    .join(",");
+  return visible ? `${grade} (${visible})` : String(grade);
 }
 
 function formatGrade(grade: number | null, note: string | null): string {

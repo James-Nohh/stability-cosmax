@@ -15,6 +15,7 @@ const PERIOD_COLUMNS: Record<string, number> = {
   "3개월": 21,
 };
 const INITIAL_COLUMN = 3; // C
+const ALL_DATA_COLUMNS = [INITIAL_COLUMN, ...Object.values(PERIOD_COLUMNS)];
 
 // 조건(4℃/25℃/37℃/45℃/일광) -> R1 시트의 행 번호
 const CONDITION_ROWS: Record<
@@ -73,6 +74,12 @@ function detachStyle(cell: ExcelJS.Cell) {
   cell.style = { ...cell.style };
 }
 
+const NO_FILL: ExcelJS.Fill = { type: "pattern", pattern: "none" };
+const GRAY_FILL: ExcelJS.Fill = {
+  type: "pattern",
+  pattern: "solid",
+  fgColor: { theme: 0, tint: -0.1499984740745262 } as unknown as ExcelJS.Color,
+};
 const FILL_GRADE_2: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFC7CE" } };
 const FILL_GRADE_3: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFC00000" } };
 
@@ -91,10 +98,14 @@ function setApOdorCell(
     cell.value = 0;
     return;
   }
-  const reasons = (note ?? "").split(",").filter(Boolean);
-  const keywords = kind === "appearance" ? REASON_APPEARANCE : REASON_ODOR;
-  const relevant = reasons.filter((r) => keywords.includes(r));
-  cell.value = relevant.length > 0 ? `${value} (${relevant.join(",")})` : value;
+  if (kind === "appearance") {
+    const reasons = (note ?? "").split(",").filter(Boolean);
+    const relevant = reasons.filter((r) => REASON_APPEARANCE.includes(r));
+    cell.value = relevant.length > 0 ? `${value} (${relevant.join(",")})` : value;
+  } else {
+    // Odor는 숫자만 표시 (사유 텍스트 없음)
+    cell.value = value;
+  }
 
   if (value === 2 || value === 3) {
     detachStyle(cell);
@@ -112,6 +123,37 @@ export async function buildR1Workbook(batchRows: Schedule[], user: User): Promis
   }
   const ws = workbook.getWorksheet("R1");
   if (!ws) throw new Error("R1 시트를 찾을 수 없습니다.");
+
+  // --- 배경색 정리 (값을 쓰기 전에 먼저 처리 — 등급 2/3 빨간색이 나중에 덮어씁니다) ---
+
+  // 4℃~Window의 Appearance/Odor 숫자 셀과 25℃ pH/Specific Gravity/Hardness는
+  // 기본적으로 색 없음. (등급 2/3만 setApOdorCell에서 별도로 빨간색 적용)
+  const APPEARANCE_ODOR_ROWS = [12, 13, 14, 15, 19, 20, 24, 25, 29, 30];
+  for (const r of [...APPEARANCE_ODOR_ROWS, 16, 17, 18]) {
+    for (const c of ALL_DATA_COLUMNS) {
+      const cell = ws.getCell(r, c);
+      detachStyle(cell);
+      cell.fill = NO_FILL;
+    }
+  }
+  // 25℃ Specific Gravity(17행)는 Initial 열에만 실제 값이 들어가므로,
+  // 기간(1일~3개월) 열은 다시 회색으로 되돌립니다.
+  for (const c of Object.values(PERIOD_COLUMNS)) {
+    const cell = ws.getCell(17, c);
+    detachStyle(cell);
+    cell.fill = GRAY_FILL;
+  }
+
+  // 우측 끝 Remarks 열(AA:AB) 10~30행 전체 회색 음영
+  for (let r = 10; r <= 30; r++) {
+    for (const c of [27, 28]) {
+      const cell = ws.getCell(r, c);
+      detachStyle(cell);
+      cell.fill = GRAY_FILL;
+    }
+  }
+
+  // --- 값 채우기 ---
 
   const byLabel = new Map(batchRows.map((r) => [r.label, r]));
   const first = batchRows[0];
@@ -197,21 +239,19 @@ export async function buildR1Workbook(batchRows: Schedule[], user: User): Promis
     }
   }
 
+  // 박스 가운데에 "이미지 첨부" 안내 문구
+  const labelStartRow = Math.floor((TOP + BOTTOM) / 2) - 1;
+  ws.mergeCells(labelStartRow, LEFT + 1, labelStartRow + 1, RIGHT - 1);
+  const labelCell = ws.getCell(labelStartRow, LEFT + 1);
+  detachStyle(labelCell);
+  labelCell.value = "이미지 첨부";
+  labelCell.alignment = { horizontal: "center", vertical: "middle" };
+  labelCell.font = { ...labelCell.font, size: 14, color: { argb: "FF0000FF" } };
+
   // 우측 끝 Remarks 열(AA:AB) — 라벨/내용만 지우고 열 자체는 그대로 둡니다.
   for (let r = 9; r <= 34; r++) {
     ws.getCell(r, 27).value = null;
     ws.getCell(r, 28).value = null;
-  }
-
-  // 25℃ 항목(Appearance/Odor/pH/Specific Gravity/Hardness)의 회색 음영 제거
-  const NO_FILL: ExcelJS.Fill = { type: "pattern", pattern: "none" };
-  const cond25Cols = [INITIAL_COLUMN, ...Object.values(PERIOD_COLUMNS)];
-  for (let r = 14; r <= 18; r++) {
-    for (const c of cond25Cols) {
-      const cell = ws.getCell(r, c);
-      detachStyle(cell);
-      cell.fill = NO_FILL;
-    }
   }
 
   // 템플릿 원본 오타: 4℃ Odor 행(13)만 Initial 열 C:E 병합이 빠져 있어 숫자가
