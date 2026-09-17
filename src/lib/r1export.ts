@@ -197,14 +197,28 @@ export async function buildR1Workbook(batchRows: Schedule[], user: User): Promis
     }
   }
 
-  // 우측 끝 Remarks 열(AA:AB) 제거 — 구조를 건드리면 병합 셀이 깨질 위험이 있어
-  // 숨김 + 내용 삭제로 처리합니다.
+  // 우측 끝 Remarks 열(AA:AB) — 라벨/내용만 지우고 열 자체는 그대로 둡니다.
   for (let r = 9; r <= 34; r++) {
     ws.getCell(r, 27).value = null;
     ws.getCell(r, 28).value = null;
   }
-  ws.getColumn(27).hidden = true;
-  ws.getColumn(28).hidden = true;
+
+  // 25℃ 항목(Appearance/Odor/pH/Specific Gravity/Hardness)의 회색 음영 제거
+  const NO_FILL: ExcelJS.Fill = { type: "pattern", pattern: "none" };
+  const cond25Cols = [INITIAL_COLUMN, ...Object.values(PERIOD_COLUMNS)];
+  for (let r = 14; r <= 18; r++) {
+    for (const c of cond25Cols) {
+      const cell = ws.getCell(r, c);
+      detachStyle(cell);
+      cell.fill = NO_FILL;
+    }
+  }
+
+  // 템플릿 원본 오타: 4℃ Odor 행(13)만 Initial 열 C:E 병합이 빠져 있어 숫자가
+  // 가운데 정렬되지 않았습니다. Appearance 행(12)과 동일하게 병합해 맞춥니다.
+  if (!ws.getCell("C13").isMerged) {
+    ws.mergeCells("C13:E13");
+  }
 
   return workbook.xlsx.writeBuffer();
 }
