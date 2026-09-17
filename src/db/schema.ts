@@ -4,6 +4,7 @@ export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  displayName: text("display_name"), // R1 엑셀 양식의 "Name" 칸에 쓰일 한글 이름
   createdAt: text("created_at").notNull().default("CURRENT_TIMESTAMP"),
 });
 
@@ -51,6 +52,9 @@ export const stabilitySchedules = sqliteTable("stability_schedules", {
   // 25℃ 항목 전용 추가 측정값
   ph25c: text("ph_25c"),
   viscosity25c: text("viscosity_25c"),
+
+  // R1 엑셀 양식 Conclusion란에 들어갈 한 줄 평. 배치(batchId) 내 모든 행에 동일하게 저장됩니다.
+  conclusion: text("conclusion"),
 
   createdAt: text("created_at").notNull().default("CURRENT_TIMESTAMP"),
 });

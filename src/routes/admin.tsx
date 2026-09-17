@@ -2,11 +2,11 @@ import { Hono } from "hono";
 import { drizzle } from "drizzle-orm/d1";
 import { eq, desc } from "drizzle-orm";
 import { raw } from "hono/utils/html";
-import * as XLSX from "xlsx";
 import { stabilitySchedules, batchLogs } from "../db/schema";
 import { requireAuth } from "../middleware/auth";
 import { Layout } from "../views/layout";
 import { kstTodayDateOnly, addDays, addMonths, formatDateStr, nowKst } from "../lib/time";
+import { buildR1Workbook } from "../lib/r1export";
 import type { Env, Variables } from "../types";
 
 export const adminRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -193,6 +193,20 @@ adminRoutes.get("/admin", async (c) => {
                 </tbody>
               </table>
             </div>
+            <form method="post" action={`/admin/stability/${batchId}/conclusion`} class="row" style="margin-top:12px;">
+              <div style="flex:1">
+                <label>결론 한 줄 평 (엑셀 Conclusion에 반영)</label>
+                <input
+                  type="text"
+                  name="conclusion"
+                  value={batch.items[0]?.conclusion ?? ""}
+                  style="width:100%"
+                />
+              </div>
+              <div style="display:flex;align-items:flex-end;">
+                <button type="submit" class="secondary">저장</button>
+              </div>
+            </form>
           </div>
         ))}
       </div>
@@ -240,6 +254,18 @@ adminRoutes.post("/admin/stability/:batchId/delete", async (c) => {
   return c.redirect("/admin");
 });
 
+adminRoutes.post("/admin/stability/:batchId/conclusion", async (c) => {
+  const db = drizzle(c.env.DB);
+  const batchId = c.req.param("batchId");
+  const body = await c.req.parseBody();
+  const conclusion = String(body.conclusion ?? "").trim();
+  await db
+    .update(stabilitySchedules)
+    .set({ conclusion: conclusion || null })
+    .where(eq(stabilitySchedules.batchId, batchId));
+  return c.redirect("/admin");
+});
+
 adminRoutes.get("/admin/stability/:batchId/export", async (c) => {
   const db = drizzle(c.env.DB);
   const batchId = c.req.param("batchId");
@@ -252,28 +278,7 @@ adminRoutes.get("/admin/stability/:batchId/export", async (c) => {
     return c.text("존재하지 않는 안정도입니다.", 404);
   }
 
-  const order = CHECKPOINTS.map((cp) => cp.label);
-  const sorted = [...rows].sort((a, b) => order.indexOf(a.label) - order.indexOf(b.label));
-
-  const header = ["구간", ...CONDITIONS.map((cond) => cond.label)];
-  const data = [
-    header,
-    ...sorted.map((row) => [
-      row.label,
-      ...CONDITIONS.map((cond) => {
-        const base = gradeNoteText(row[cond.field], row[cond.noteField]) ?? "";
-        if (cond.field !== "gradeC25") return base;
-        const extra = ph25Text(row.ph25c, row.viscosity25c);
-        return extra ? `${base} [${extra}]`.trim() : base;
-      }),
-    ]),
-  ];
-
-  const worksheet = XLSX.utils.aoa_to_sheet(data);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "안정도");
-
-  const buffer = XLSX.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+  const buffer = await buildR1Workbook(rows, c.get("user"));
 
   const { productName, labNo } = rows[0];
   const filename = `안정도_${productName}_${labNo}.xlsx`.replace(/[\\/:*?"<>|]/g, "_");
