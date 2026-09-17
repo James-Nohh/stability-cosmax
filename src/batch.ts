@@ -133,7 +133,7 @@ async function sendAndLog(env: Env, db: DrizzleD1Database, schedule: Schedule) {
 
   const caution = await buildCautionText(db, schedule);
   if (caution) {
-    message += `\n\n⚠️ ${caution}`;
+    message += `\n\n⚠️\n\n${caution}`;
   }
 
   const results = await Promise.allSettled([
