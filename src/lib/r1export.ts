@@ -17,44 +17,41 @@ const PERIOD_COLUMNS: Record<string, number> = {
 const INITIAL_COLUMN = 3; // C
 const ALL_DATA_COLUMNS = [INITIAL_COLUMN, ...Object.values(PERIOD_COLUMNS)];
 
-// 조건(4℃/25℃/37℃/45℃/일광) -> R1 시트의 행 번호
+// 조건(4℃/25℃/37℃/45℃/일광) -> R1 시트의 행 번호 및 해당 등급이 저장된 컬럼
 const CONDITION_ROWS: Record<
   string,
-  { appearance: number; odor: number; ph?: number; specificGravity?: number; hardness?: number }
+  {
+    appearance: number;
+    odor: number;
+    appearanceField: keyof Schedule;
+    odorField: keyof Schedule;
+    noteField: keyof Schedule;
+    ph?: number;
+    specificGravity?: number;
+    hardness?: number;
+  }
 > = {
-  gradeC4: { appearance: 12, odor: 13 },
-  gradeC25: { appearance: 14, odor: 15, ph: 16, specificGravity: 17, hardness: 18 },
-  gradeC37: { appearance: 19, odor: 20 },
-  gradeC45: { appearance: 24, odor: 25 },
-  gradeSunlight: { appearance: 29, odor: 30 },
+  c4: { appearance: 12, odor: 13, appearanceField: "gradeAppearanceC4", odorField: "gradeOdorC4", noteField: "noteAppearanceC4" },
+  c25: {
+    appearance: 14,
+    odor: 15,
+    ph: 16,
+    specificGravity: 17,
+    hardness: 18,
+    appearanceField: "gradeAppearanceC25",
+    odorField: "gradeOdorC25",
+    noteField: "noteAppearanceC25",
+  },
+  c37: { appearance: 19, odor: 20, appearanceField: "gradeAppearanceC37", odorField: "gradeOdorC37", noteField: "noteAppearanceC37" },
+  c45: { appearance: 24, odor: 25, appearanceField: "gradeAppearanceC45", odorField: "gradeOdorC45", noteField: "noteAppearanceC45" },
+  sunlight: {
+    appearance: 29,
+    odor: 30,
+    appearanceField: "gradeAppearanceSunlight",
+    odorField: "gradeOdorSunlight",
+    noteField: "noteAppearanceSunlight",
+  },
 };
-
-const NOTE_FIELD: Record<string, keyof Schedule> = {
-  gradeC4: "noteC4",
-  gradeC25: "noteC25",
-  gradeC37: "noteC37",
-  gradeC45: "noteC45",
-  gradeSunlight: "noteSunlight",
-};
-
-const REASON_APPEARANCE = ["분리", "변색"];
-const REASON_ODOR = ["변취"];
-
-// Appearance는 분리/변색, Odor는 변취와 연관지어 등급을 배분합니다.
-// 특이사항을 고르지 않았으면(등급>0인데 사유 미선택) 양쪽 다 등급을 반영합니다.
-function apOdorValue(
-  grade: number | null,
-  note: string | null,
-  kind: "appearance" | "odor"
-): number | null {
-  if (grade == null) return null;
-  if (grade === 0) return 0;
-  const reasons = (note ?? "").split(",").filter(Boolean);
-  const keywords = kind === "appearance" ? REASON_APPEARANCE : REASON_ODOR;
-  const relevant = reasons.some((r) => keywords.includes(r));
-  if (relevant || reasons.length === 0) return grade;
-  return 0;
-}
 
 function parseDateOnly(dateStr: string): Date {
   return new Date(`${dateStr}T00:00:00Z`);
@@ -83,34 +80,23 @@ const GRAY_FILL: ExcelJS.Fill = {
 const FILL_GRADE_2: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFC7CE" } };
 const FILL_GRADE_3: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFC00000" } };
 
-function setApOdorCell(
-  cell: ExcelJS.Cell,
-  grade: number | null,
-  note: string | null,
-  kind: "appearance" | "odor"
-) {
-  const value = apOdorValue(grade, note, kind);
-  if (value == null) {
+// note가 있으면(Appearance) 사유를 괄호로 덧붙이고, 없으면(Odor) 숫자만 표시합니다.
+function setGradeCell(cell: ExcelJS.Cell, grade: number | null, note: string | null) {
+  if (grade == null) {
     cell.value = null;
     return;
   }
-  if (value === 0) {
+  if (grade === 0) {
     cell.value = 0;
     return;
   }
-  if (kind === "appearance") {
-    const reasons = (note ?? "").split(",").filter(Boolean);
-    const relevant = reasons.filter((r) => REASON_APPEARANCE.includes(r));
-    cell.value = relevant.length > 0 ? `${value} (${relevant.join(",")})` : value;
-  } else {
-    // Odor는 숫자만 표시 (사유 텍스트 없음)
-    cell.value = value;
-  }
+  const reasons = (note ?? "").split(",").filter(Boolean);
+  cell.value = reasons.length > 0 ? `${grade} (${reasons.join(",")})` : grade;
 
-  if (value === 2 || value === 3) {
+  if (grade === 2 || grade === 3) {
     detachStyle(cell);
-    cell.fill = value === 2 ? FILL_GRADE_2 : FILL_GRADE_3;
-    if (value === 3) cell.font = { ...cell.font, color: { argb: "FFFFFFFF" } };
+    cell.fill = grade === 2 ? FILL_GRADE_2 : FILL_GRADE_3;
+    if (grade === 3) cell.font = { ...cell.font, color: { argb: "FFFFFFFF" } };
   }
 }
 
@@ -153,6 +139,19 @@ export async function buildR1Workbook(batchRows: Schedule[], user: User): Promis
     }
   }
 
+  // Z열(26) 10~30행: 굵은(medium) 검은 실선을 얇게(thin) 조정
+  for (let r = 10; r <= 30; r++) {
+    const cell = ws.getCell(r, 26);
+    const existing = cell.border ?? {};
+    detachStyle(cell);
+    cell.border = {
+      top: existing.top,
+      bottom: existing.bottom,
+      left: existing.left,
+      right: { style: "thin", color: { indexed: 64 } as unknown as ExcelJS.Color },
+    };
+  }
+
   // --- 값 채우기 ---
 
   const byLabel = new Map(batchRows.map((r) => [r.label, r]));
@@ -171,13 +170,11 @@ export async function buildR1Workbook(batchRows: Schedule[], user: User): Promis
     for (const [field, rows] of Object.entries(CONDITION_ROWS)) {
       ws.getCell(rows.appearance, INITIAL_COLUMN).value = 0;
       ws.getCell(rows.odor, INITIAL_COLUMN).value = 0;
-      if (field === "gradeC25") {
-        if (rows.ph) ws.getCell(rows.ph, INITIAL_COLUMN).value = dayZero.ph25c || null;
-        if (rows.specificGravity) {
-          ws.getCell(rows.specificGravity, INITIAL_COLUMN).value = dayZero.specificGravity25c || null;
-        }
-        if (rows.hardness) ws.getCell(rows.hardness, INITIAL_COLUMN).value = dayZero.viscosity25c || null;
+      if (rows.ph) ws.getCell(rows.ph, INITIAL_COLUMN).value = dayZero.ph25c || null;
+      if (rows.specificGravity) {
+        ws.getCell(rows.specificGravity, INITIAL_COLUMN).value = dayZero.specificGravity25c || null;
       }
+      if (rows.hardness) ws.getCell(rows.hardness, INITIAL_COLUMN).value = dayZero.viscosity25c || null;
     }
   }
 
@@ -187,17 +184,16 @@ export async function buildR1Workbook(batchRows: Schedule[], user: User): Promis
 
     ws.getCell(11, col).value = parseDateOnly(row.targetDate);
 
-    for (const [field, rows] of Object.entries(CONDITION_ROWS)) {
-      const grade = row[field as keyof Schedule] as number | null;
-      const note = row[NOTE_FIELD[field]] as string | null;
+    for (const rows of Object.values(CONDITION_ROWS)) {
+      const appearanceGrade = row[rows.appearanceField] as number | null;
+      const odorGrade = row[rows.odorField] as number | null;
+      const note = row[rows.noteField] as string | null;
 
-      setApOdorCell(ws.getCell(rows.appearance, col), grade, note, "appearance");
-      setApOdorCell(ws.getCell(rows.odor, col), grade, note, "odor");
+      setGradeCell(ws.getCell(rows.appearance, col), appearanceGrade, note);
+      setGradeCell(ws.getCell(rows.odor, col), odorGrade, null);
 
-      if (field === "gradeC25") {
-        if (rows.ph) ws.getCell(rows.ph, col).value = row.ph25c || null;
-        if (rows.hardness) ws.getCell(rows.hardness, col).value = row.viscosity25c || null;
-      }
+      if (rows.ph) ws.getCell(rows.ph, col).value = row.ph25c || null;
+      if (rows.hardness) ws.getCell(rows.hardness, col).value = row.viscosity25c || null;
     }
   }
 

@@ -29,40 +29,79 @@ const GRADE_LABELS = [
   "3 - 부적합",
 ];
 
+// Appearance(외관: 분리/변색)와 Odor(변취)를 조건별로 각각 독립 입력받습니다.
+// Odor는 사유 없이 숫자 등급만 기록합니다.
 const CONDITIONS = [
-  { field: "gradeC4", inputName: "grade4c", noteField: "noteC4", noteInputName: "note4c", label: "4℃" },
-  { field: "gradeC25", inputName: "grade25c", noteField: "noteC25", noteInputName: "note25c", label: "25℃" },
-  { field: "gradeC37", inputName: "grade37c", noteField: "noteC37", noteInputName: "note37c", label: "37℃" },
-  { field: "gradeC45", inputName: "grade45c", noteField: "noteC45", noteInputName: "note45c", label: "45℃" },
   {
-    field: "gradeSunlight",
-    inputName: "gradeSunlight",
-    noteField: "noteSunlight",
-    noteInputName: "noteSunlight",
+    label: "4℃",
+    appearanceField: "gradeAppearanceC4",
+    appearanceInputName: "gradeAppearanceC4",
+    odorField: "gradeOdorC4",
+    odorInputName: "gradeOdorC4",
+    noteField: "noteAppearanceC4",
+    noteInputName: "noteAppearanceC4",
+    isC25: false,
+  },
+  {
+    label: "25℃",
+    appearanceField: "gradeAppearanceC25",
+    appearanceInputName: "gradeAppearanceC25",
+    odorField: "gradeOdorC25",
+    odorInputName: "gradeOdorC25",
+    noteField: "noteAppearanceC25",
+    noteInputName: "noteAppearanceC25",
+    isC25: true,
+  },
+  {
+    label: "37℃",
+    appearanceField: "gradeAppearanceC37",
+    appearanceInputName: "gradeAppearanceC37",
+    odorField: "gradeOdorC37",
+    odorInputName: "gradeOdorC37",
+    noteField: "noteAppearanceC37",
+    noteInputName: "noteAppearanceC37",
+    isC25: false,
+  },
+  {
+    label: "45℃",
+    appearanceField: "gradeAppearanceC45",
+    appearanceInputName: "gradeAppearanceC45",
+    odorField: "gradeOdorC45",
+    odorInputName: "gradeOdorC45",
+    noteField: "noteAppearanceC45",
+    noteInputName: "noteAppearanceC45",
+    isC25: false,
+  },
+  {
     label: "일광",
+    appearanceField: "gradeAppearanceSunlight",
+    appearanceInputName: "gradeAppearanceSunlight",
+    odorField: "gradeOdorSunlight",
+    odorInputName: "gradeOdorSunlight",
+    noteField: "noteAppearanceSunlight",
+    noteInputName: "noteAppearanceSunlight",
+    isC25: false,
   },
 ] as const satisfies {
-  field: keyof typeof stabilitySchedules.$inferSelect;
-  inputName: string;
+  label: string;
+  appearanceField: keyof typeof stabilitySchedules.$inferSelect;
+  appearanceInputName: string;
+  odorField: keyof typeof stabilitySchedules.$inferSelect;
+  odorInputName: string;
   noteField: keyof typeof stabilitySchedules.$inferSelect;
   noteInputName: string;
-  label: string;
+  isC25: boolean;
 }[];
 
-const REASON_OPTIONS = ["분리", "변색", "변취"];
-
-function gradeNoteText(grade: number | null, note: string | null): string | null {
-  if (grade == null) return null;
-  // '변취'는 표시하지 않음 (Odor는 숫자만 노출)
-  const visible = (note ?? "")
-    .split(",")
-    .filter((r) => r && r !== "변취")
-    .join(",");
-  return visible ? `${grade} (${visible})` : String(grade);
-}
+const REASON_OPTIONS = ["분리", "변색"];
 
 function formatGrade(grade: number | null, note: string | null): string {
-  return gradeNoteText(grade, note) ?? "-";
+  if (grade == null) return "-";
+  return note ? `${grade} (${note})` : String(grade);
+}
+
+function formatOdor(grade: number | null): string {
+  return grade == null ? "-" : String(grade);
 }
 
 function extra25Text(ph: string | null, viscosity: string | null, specificGravity: string | null): string | null {
@@ -204,8 +243,15 @@ adminRoutes.get("/admin", async (c) => {
                       </td>
                       {CONDITIONS.map((cond) => (
                         <td>
-                          {formatGrade(item[cond.field], item[cond.noteField])}
-                          {cond.field === "gradeC25" &&
+                          <div>
+                            <span style="font-size:11px;color:#6b7280;">외관</span>{" "}
+                            {formatGrade(item[cond.appearanceField], item[cond.noteField])}
+                          </div>
+                          <div>
+                            <span style="font-size:11px;color:#6b7280;">냄새</span>{" "}
+                            {formatOdor(item[cond.odorField])}
+                          </div>
+                          {cond.isC25 &&
                             extra25Text(item.ph25c, item.viscosity25c, item.specificGravity25c) && (
                               <div style="font-size:11px;color:#6b7280;">
                                 {extra25Text(item.ph25c, item.viscosity25c, item.specificGravity25c)}
@@ -268,11 +314,16 @@ adminRoutes.post("/admin/stability", async (c) => {
     label: "0일",
     sent: true,
     acknowledgedAt: now,
-    gradeC4: 0,
-    gradeC25: 0,
-    gradeC37: 0,
-    gradeC45: 0,
-    gradeSunlight: 0,
+    gradeAppearanceC4: 0,
+    gradeOdorC4: 0,
+    gradeAppearanceC25: 0,
+    gradeOdorC25: 0,
+    gradeAppearanceC37: 0,
+    gradeOdorC37: 0,
+    gradeAppearanceC45: 0,
+    gradeOdorC45: 0,
+    gradeAppearanceSunlight: 0,
+    gradeOdorSunlight: 0,
     ph25c: ph0 || null,
     viscosity25c: viscosity0 || null,
     specificGravity25c: specificGravity0 || null,
@@ -433,49 +484,72 @@ adminRoutes.get("/ack/:id", async (c) => {
         <form method="post" action={`/ack/${id}`}>
           {CONDITIONS.map((cond) => {
             const existingNotes = (schedule[cond.noteField] ?? "").split(",").filter(Boolean);
-            const noteBoxId = `note-${cond.inputName}`;
-            const currentGrade = schedule[cond.field];
-            const showNotes = currentGrade != null && currentGrade > 0;
+            const noteBoxId = `note-${cond.appearanceInputName}`;
+            const currentAppearance = schedule[cond.appearanceField];
+            const currentOdor = schedule[cond.odorField];
+            const showNotes = currentAppearance != null && currentAppearance > 0;
             return (
-              <div class="row">
+              <div class="row" style="border-top:1px solid #e5e7eb;padding-top:12px;margin-top:12px;">
                 <div style="flex:1">
                   <label>{cond.label}</label>
-                  <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
-                    {GRADE_LABELS.map((glabel, gvalue) => (
-                      <label style="font-weight:normal;font-size:14px;color:#1a1a1a;display:flex;align-items:center;gap:8px;cursor:pointer;">
-                        <input
-                          type="radio"
-                          name={cond.inputName}
-                          value={gvalue}
-                          class="grade-radio"
-                          data-note-target={noteBoxId}
-                          required
-                          checked={currentGrade === gvalue}
-                        />
-                        {glabel}
-                      </label>
-                    ))}
-                  </div>
-                  <div
-                    id={noteBoxId}
-                    style={`margin-top:8px;padding:8px 12px;background:#f9fafb;border-radius:6px;${showNotes ? "" : "display:none;"}`}
-                  >
-                    <span style="font-size:12px;color:#6b7280;">특이사항 (해당 항목 선택)</span>
-                    <div style="display:flex;gap:14px;margin-top:4px;">
-                      {REASON_OPTIONS.map((reason) => (
-                        <label style="font-weight:normal;font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;">
-                          <input
-                            type="checkbox"
-                            name={cond.noteInputName}
-                            value={reason}
-                            checked={existingNotes.includes(reason)}
-                          />
-                          {reason}
-                        </label>
-                      ))}
+                  <div style="display:flex;gap:28px;margin-top:6px;flex-wrap:wrap;">
+                    <div>
+                      <span style="font-size:12px;color:#6b7280;">Appearance (외관)</span>
+                      <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+                        {GRADE_LABELS.map((glabel, gvalue) => (
+                          <label style="font-weight:normal;font-size:14px;color:#1a1a1a;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                            <input
+                              type="radio"
+                              name={cond.appearanceInputName}
+                              value={gvalue}
+                              class="grade-radio"
+                              data-note-target={noteBoxId}
+                              required
+                              checked={currentAppearance === gvalue}
+                            />
+                            {glabel}
+                          </label>
+                        ))}
+                      </div>
+                      <div
+                        id={noteBoxId}
+                        style={`margin-top:8px;padding:8px 12px;background:#f9fafb;border-radius:6px;${showNotes ? "" : "display:none;"}`}
+                      >
+                        <span style="font-size:12px;color:#6b7280;">특이사항 (해당 항목 선택)</span>
+                        <div style="display:flex;gap:14px;margin-top:4px;">
+                          {REASON_OPTIONS.map((reason) => (
+                            <label style="font-weight:normal;font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                              <input
+                                type="checkbox"
+                                name={cond.noteInputName}
+                                value={reason}
+                                checked={existingNotes.includes(reason)}
+                              />
+                              {reason}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <span style="font-size:12px;color:#6b7280;">Odor (냄새)</span>
+                      <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+                        {GRADE_LABELS.map((glabel, gvalue) => (
+                          <label style="font-weight:normal;font-size:14px;color:#1a1a1a;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                            <input
+                              type="radio"
+                              name={cond.odorInputName}
+                              value={gvalue}
+                              required
+                              checked={currentOdor === gvalue}
+                            />
+                            {glabel}
+                          </label>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                  {cond.field === "gradeC25" && (
+                  {cond.isC25 && (
                     <div style="display:flex;gap:8px;margin-top:8px;">
                       <div>
                         <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">pH</label>
@@ -521,18 +595,23 @@ adminRoutes.post("/ack/:id", async (c) => {
   const id = Number(c.req.param("id"));
   const body = await c.req.parseBody({ all: true });
 
+  function parseGrade(raw: unknown): number | null {
+    const parsed = typeof raw === "string" ? Number(raw) : NaN;
+    return Number.isInteger(parsed) && parsed >= 0 && parsed <= 3 ? parsed : null;
+  }
+
   const values: Record<string, number | string | null> = {};
   for (const cond of CONDITIONS) {
-    const raw = body[cond.inputName];
-    const parsed = typeof raw === "string" ? Number(raw) : NaN;
-    const grade = Number.isInteger(parsed) && parsed >= 0 && parsed <= 3 ? parsed : null;
-    values[cond.field] = grade;
+    const appearanceGrade = parseGrade(body[cond.appearanceInputName]);
+    values[cond.appearanceField] = appearanceGrade;
+    values[cond.odorField] = parseGrade(body[cond.odorInputName]);
 
     const noteRaw = body[cond.noteInputName];
     const notes = (Array.isArray(noteRaw) ? noteRaw : noteRaw ? [noteRaw] : [])
       .map(String)
       .filter((n) => REASON_OPTIONS.includes(n));
-    values[cond.noteField] = grade && grade > 0 && notes.length > 0 ? notes.join(",") : null;
+    values[cond.noteField] =
+      appearanceGrade && appearanceGrade > 0 && notes.length > 0 ? notes.join(",") : null;
   }
 
   const ph25c = typeof body.ph25c === "string" ? body.ph25c.trim() : "";

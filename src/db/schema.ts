@@ -36,18 +36,26 @@ export const stabilitySchedules = sqliteTable("stability_schedules", {
   acknowledgedAt: integer("acknowledged_at"), // unix ms, "안정도 확인" 클릭 시각(설정되면 재알림 중단)
 
   // "안정도 확인" 클릭 후 입력하는 조건별 등급 (0=적합, 1=적합·특이사항, 2=조건부 적합, 3=부적합)
-  gradeC4: integer("grade_4c"),
-  gradeC25: integer("grade_25c"),
-  gradeC37: integer("grade_37c"),
-  gradeC45: integer("grade_45c"),
-  gradeSunlight: integer("grade_sunlight"),
+  // Appearance(외관: 분리/변색)와 Odor(변취)를 각각 독립적으로 입력받습니다.
+  gradeAppearanceC4: integer("grade_appearance_4c"),
+  gradeOdorC4: integer("grade_odor_4c"),
+  noteAppearanceC4: text("note_appearance_4c"), // 분리/변색, 콤마로 구분
 
-  // 등급 1~3일 때 선택하는 특이사항(분리/변색/변취), 콤마로 구분해 저장
-  noteC4: text("note_4c"),
-  noteC25: text("note_25c"),
-  noteC37: text("note_37c"),
-  noteC45: text("note_45c"),
-  noteSunlight: text("note_sunlight"),
+  gradeAppearanceC25: integer("grade_appearance_25c"),
+  gradeOdorC25: integer("grade_odor_25c"),
+  noteAppearanceC25: text("note_appearance_25c"),
+
+  gradeAppearanceC37: integer("grade_appearance_37c"),
+  gradeOdorC37: integer("grade_odor_37c"),
+  noteAppearanceC37: text("note_appearance_37c"),
+
+  gradeAppearanceC45: integer("grade_appearance_45c"),
+  gradeOdorC45: integer("grade_odor_45c"),
+  noteAppearanceC45: text("note_appearance_45c"),
+
+  gradeAppearanceSunlight: integer("grade_appearance_sunlight"),
+  gradeOdorSunlight: integer("grade_odor_sunlight"),
+  noteAppearanceSunlight: text("note_appearance_sunlight"),
 
   // 25℃ 항목 전용 추가 측정값. specificGravity25c는 "0일"(안정도 시작 시점) 행에만 입력됩니다.
   ph25c: text("ph_25c"),
