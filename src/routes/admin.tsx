@@ -250,6 +250,9 @@ adminRoutes.get("/admin", async (c) => {
                 <a href={`/admin/stability/${batchId}/export`} class="btn-excel">
                   엑셀 다운로드
                 </a>
+                <a href={`/admin/stability/${batchId}/edit`} class="btn-edit">
+                  수정
+                </a>
                 <form
                   class="delete-form"
                   method="post"
@@ -468,6 +471,204 @@ adminRoutes.get("/admin/stability/:batchId/export", async (c) => {
       "Content-Disposition": `attachment; filename="stability.xlsx"; filename*=UTF-8''${encodeURIComponent(filename)}`,
     },
   });
+});
+
+adminRoutes.get("/admin/stability/:batchId/edit", async (c) => {
+  const db = drizzle(c.env.DB);
+  const batchId = c.req.param("batchId");
+  const rows = await db
+    .select()
+    .from(stabilitySchedules)
+    .where(eq(stabilitySchedules.batchId, batchId))
+    .orderBy(stabilitySchedules.id);
+
+  if (rows.length === 0) {
+    return c.html(
+      <Layout title="안정도 수정">
+        <div class="card">존재하지 않는 안정도입니다.</div>
+      </Layout>
+    );
+  }
+
+  return c.html(
+    <Layout title="안정도 수정">
+      <div class="card">
+        <h2>안정도 수정</h2>
+        <p>
+          <strong>{rows[0].productName}</strong> · Lab No. {rows[0].labNo}
+        </p>
+        <form method="post" action={`/admin/stability/${batchId}/edit`}>
+          {rows.map((row) => (
+            <fieldset>
+              <legend>
+                {segmentLabel(row.label)} ({row.targetDate})
+              </legend>
+              {CONDITIONS.map((cond) => {
+                const existingNotes = (row[cond.noteField] ?? "").split(",").filter(Boolean);
+                const noteBoxId = `note_${row.id}_${cond.appearanceInputName}`;
+                const currentAppearance = row[cond.appearanceField];
+                const currentOdor = row[cond.odorField];
+                const showNotes = currentAppearance != null && currentAppearance > 0;
+                return (
+                  <div class="row" style="border-top:1px solid #e5e7eb;padding-top:10px;margin-top:10px;">
+                    <div style="flex:1">
+                      <label>{cond.label}</label>
+                      <div style="display:flex;gap:28px;margin-top:6px;flex-wrap:wrap;">
+                        <div>
+                          <span style="font-size:12px;color:#6b7280;">Appearance (외관)</span>
+                          <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+                            {GRADE_LABELS.map((glabel, gvalue) => (
+                              <label style="font-weight:normal;font-size:14px;color:#1a1a1a;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input
+                                  type="radio"
+                                  name={`${row.id}_${cond.appearanceInputName}`}
+                                  value={gvalue}
+                                  class="grade-radio"
+                                  data-note-target={noteBoxId}
+                                  checked={currentAppearance === gvalue}
+                                />
+                                {glabel}
+                              </label>
+                            ))}
+                          </div>
+                          <div
+                            id={noteBoxId}
+                            style={`margin-top:8px;padding:8px 12px;background:#f9fafb;border-radius:6px;${showNotes ? "" : "display:none;"}`}
+                          >
+                            <span style="font-size:12px;color:#6b7280;">특이사항 (해당 항목 선택)</span>
+                            <div style="display:flex;gap:14px;margin-top:4px;">
+                              {REASON_OPTIONS.map((reason) => (
+                                <label style="font-weight:normal;font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                                  <input
+                                    type="checkbox"
+                                    name={`${row.id}_${cond.noteInputName}`}
+                                    value={reason}
+                                    checked={existingNotes.includes(reason)}
+                                  />
+                                  {reason}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <span style="font-size:12px;color:#6b7280;">Odor (냄새)</span>
+                          <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+                            {GRADE_LABELS.map((glabel, gvalue) => (
+                              <label style="font-weight:normal;font-size:14px;color:#1a1a1a;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input
+                                  type="radio"
+                                  name={`${row.id}_${cond.odorInputName}`}
+                                  value={gvalue}
+                                  checked={currentOdor === gvalue}
+                                />
+                                {glabel}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      {cond.isC25 && (
+                        <div style="display:flex;gap:8px;margin-top:8px;">
+                          <div>
+                            <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">pH</label>
+                            <input type="text" name={`${row.id}_ph25c`} value={row.ph25c ?? ""} style="width:80px" />
+                          </div>
+                          <div>
+                            <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">
+                              점(경)도
+                            </label>
+                            <input
+                              type="text"
+                              name={`${row.id}_viscosity25c`}
+                              value={row.viscosity25c ?? ""}
+                              style="width:80px"
+                            />
+                          </div>
+                          <div>
+                            <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">
+                              Specific gravity
+                            </label>
+                            <input
+                              type="text"
+                              name={`${row.id}_specificGravity25c`}
+                              value={row.specificGravity25c ?? ""}
+                              style="width:80px"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </fieldset>
+          ))}
+          <div class="row">
+            <button type="submit">저장</button>
+            <a href="/admin" style="align-self:center;">
+              취소
+            </a>
+          </div>
+        </form>
+        <script>
+          {raw(`
+          document.querySelectorAll('.grade-radio').forEach(function (radio) {
+            radio.addEventListener('change', function () {
+              var box = document.getElementById(this.getAttribute('data-note-target'));
+              if (!box) return;
+              box.style.display = this.value === '0' ? 'none' : 'block';
+            });
+          });
+        `)}
+        </script>
+      </div>
+    </Layout>
+  );
+});
+
+adminRoutes.post("/admin/stability/:batchId/edit", async (c) => {
+  const db = drizzle(c.env.DB);
+  const batchId = c.req.param("batchId");
+  const body = await c.req.parseBody({ all: true });
+
+  const rows = await db
+    .select({ id: stabilitySchedules.id })
+    .from(stabilitySchedules)
+    .where(eq(stabilitySchedules.batchId, batchId));
+
+  function parseGrade(raw: unknown): number | null {
+    const parsed = typeof raw === "string" ? Number(raw) : NaN;
+    return Number.isInteger(parsed) && parsed >= 0 && parsed <= 3 ? parsed : null;
+  }
+
+  for (const row of rows) {
+    const values: Record<string, number | string | null> = {};
+    for (const cond of CONDITIONS) {
+      const appearanceGrade = parseGrade(body[`${row.id}_${cond.appearanceInputName}`]);
+      values[cond.appearanceField] = appearanceGrade;
+      values[cond.odorField] = parseGrade(body[`${row.id}_${cond.odorInputName}`]);
+
+      const noteRaw = body[`${row.id}_${cond.noteInputName}`];
+      const notes = (Array.isArray(noteRaw) ? noteRaw : noteRaw ? [noteRaw] : [])
+        .map(String)
+        .filter((n) => REASON_OPTIONS.includes(n));
+      values[cond.noteField] =
+        appearanceGrade && appearanceGrade > 0 && notes.length > 0 ? notes.join(",") : null;
+    }
+
+    const ph25c = body[`${row.id}_ph25c`];
+    const viscosity25c = body[`${row.id}_viscosity25c`];
+    const specificGravity25c = body[`${row.id}_specificGravity25c`];
+    values.ph25c = typeof ph25c === "string" && ph25c.trim() ? ph25c.trim() : null;
+    values.viscosity25c = typeof viscosity25c === "string" && viscosity25c.trim() ? viscosity25c.trim() : null;
+    values.specificGravity25c =
+      typeof specificGravity25c === "string" && specificGravity25c.trim() ? specificGravity25c.trim() : null;
+
+    await db.update(stabilitySchedules).set(values).where(eq(stabilitySchedules.id, row.id));
+  }
+
+  return c.redirect("/admin");
 });
 
 adminRoutes.get("/admin/logs", async (c) => {
