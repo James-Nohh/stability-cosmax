@@ -237,7 +237,9 @@ adminRoutes.get("/admin", async (c) => {
           </div>
         </form>
         {batchList.length === 0 && <p>{labNoQuery ? "검색 결과가 없습니다." : "등록된 안정도가 없습니다."}</p>}
-        {batchList.map(([batchId, batch]) => (
+        {batchList.map(([batchId, batch]) => {
+          const inProgress = batch.items.some((item) => item.label !== "0일" && !item.acknowledgedAt);
+          return (
           <div style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
               <div>
@@ -248,7 +250,15 @@ adminRoutes.get("/admin", async (c) => {
                 <a href={`/admin/stability/${batchId}/export`} class="btn-excel">
                   엑셀 다운로드
                 </a>
-                <form method="post" action={`/admin/stability/${batchId}/delete`}>
+                <form
+                  method="post"
+                  action={`/admin/stability/${batchId}/delete`}
+                  onsubmit={
+                    inProgress
+                      ? "return confirm('아직 안정도 확인이 진행 중인 항목입니다. 정말 삭제하시겠습니까?');"
+                      : undefined
+                  }
+                >
                   <button type="submit" class="danger">삭제</button>
                 </form>
               </div>
@@ -314,7 +324,8 @@ adminRoutes.get("/admin", async (c) => {
               </div>
             </form>
           </div>
-        ))}
+          );
+        })}
       </div>
     </Layout>
   );
