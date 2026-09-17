@@ -123,13 +123,20 @@ function formatOdor(grade: number | null): string {
   return grade == null ? "-" : String(grade);
 }
 
-function extra25Text(ph: string | null, viscosity: string | null, specificGravity: string | null): string | null {
+function renderExtra25(ph: string | null, viscosity: string | null, specificGravity: string | null) {
   const parts = [
     ph && `pH ${ph}`,
-    specificGravity && `비중 ${specificGravity}`,
     viscosity && `점(경)도 ${viscosity}`,
+    specificGravity && `비중 ${specificGravity}`,
   ].filter(Boolean) as string[];
-  return parts.length ? parts.join(", ") : null;
+  if (parts.length === 0) return null;
+  return (
+    <div style="font-size:11px;color:#6b7280;margin-top:2px;">
+      {parts.map((part) => (
+        <div>{part}</div>
+      ))}
+    </div>
+  );
 }
 
 const SNOOZE_OPTIONS = [
@@ -264,12 +271,7 @@ adminRoutes.get("/admin", async (c) => {
                             <span style="font-size:11px;color:#6b7280;">냄새</span>{" "}
                             {formatOdor(item[cond.odorField])}
                           </div>
-                          {cond.isC25 &&
-                            extra25Text(item.ph25c, item.viscosity25c, item.specificGravity25c) && (
-                              <div style="font-size:11px;color:#6b7280;">
-                                {extra25Text(item.ph25c, item.viscosity25c, item.specificGravity25c)}
-                              </div>
-                            )}
+                          {cond.isC25 && renderExtra25(item.ph25c, item.viscosity25c, item.specificGravity25c)}
                         </td>
                       ))}
                     </tr>
