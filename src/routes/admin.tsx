@@ -95,9 +95,28 @@ const CONDITIONS = [
 
 const REASON_OPTIONS = ["분리", "변색"];
 
-function formatGrade(grade: number | null, note: string | null): string {
+const SEGMENT_LABELS: Record<string, string> = {
+  "0일": "0D",
+  "1일": "1D",
+  "1주": "1W",
+  "2주": "2W",
+  "1개월": "1M",
+  "2개월": "2M",
+  "3개월": "3M",
+};
+
+function segmentLabel(label: string): string {
+  return SEGMENT_LABELS[label] ?? label;
+}
+
+function renderGrade(grade: number | null, note: string | null) {
   if (grade == null) return "-";
-  return note ? `${grade} (${note})` : String(grade);
+  if (!note) return String(grade);
+  return (
+    <>
+      {grade} <span style="font-size:11px;color:#9ca3af;">({note})</span>
+    </>
+  );
 }
 
 function formatOdor(grade: number | null): string {
@@ -151,7 +170,7 @@ adminRoutes.get("/admin", async (c) => {
   return c.html(
     <Layout title="안정도 관리">
       <div class="card">
-        <h2>안정도 시작</h2>
+        <h2>안정도 알람/관리 헬퍼</h2>
         <form method="post" action="/admin/stability">
           <div class="row">
             <div style="flex:1">
@@ -222,7 +241,6 @@ adminRoutes.get("/admin", async (c) => {
                   <tr>
                     <th>구간</th>
                     <th>예정 시각(KST)</th>
-                    <th>상태</th>
                     {CONDITIONS.map((cond) => (
                       <th>{cond.label}</th>
                     ))}
@@ -231,21 +249,16 @@ adminRoutes.get("/admin", async (c) => {
                 <tbody>
                   {batch.items.map((item) => (
                     <tr>
-                      <td>{item.label}</td>
+                      <td>{segmentLabel(item.label)}</td>
                       <td>
                         {item.targetDate} {String(item.targetHour).padStart(2, "0")}:
                         {String(item.targetMinute).padStart(2, "0")}
-                      </td>
-                      <td>
-                        <span class={`badge ${item.sent ? "on" : "off"}`}>
-                          {item.sent ? "발송완료" : "대기"}
-                        </span>
                       </td>
                       {CONDITIONS.map((cond) => (
                         <td>
                           <div>
                             <span style="font-size:11px;color:#6b7280;">외관</span>{" "}
-                            {formatGrade(item[cond.appearanceField], item[cond.noteField])}
+                            {renderGrade(item[cond.appearanceField], item[cond.noteField])}
                           </div>
                           <div>
                             <span style="font-size:11px;color:#6b7280;">냄새</span>{" "}
