@@ -9,6 +9,8 @@ import { kstTodayDateOnly, addDays, addMonths, formatDateStr, nowKst } from "../
 import { buildR1Workbook } from "../lib/r1export";
 import type { Env, Variables } from "../types";
 
+type Schedule = typeof stabilitySchedules.$inferSelect;
+
 export const adminRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 adminRoutes.use("*", requireAuth);
@@ -134,6 +136,115 @@ function renderOdor(grade: number | null) {
   return ALERT_GRADES.has(grade) ? <span style="color:#dc2626;">{grade}</span> : String(grade);
 }
 
+// 배치의 각 구간(0일~3개월)을 등급/25℃ 값 입력 필드로 렌더링합니다.
+// /admin 목록의 인라인 "수정" 패널에서 사용합니다.
+function renderEditFieldsets(rows: Schedule[]) {
+  return rows.map((row) => (
+    <fieldset>
+      <legend>
+        {segmentLabel(row.label)} ({row.targetDate})
+      </legend>
+      {CONDITIONS.map((cond) => {
+        const existingNotes = (row[cond.noteField] ?? "").split(",").filter(Boolean);
+        const noteBoxId = `note_${row.id}_${cond.appearanceInputName}`;
+        const currentAppearance = row[cond.appearanceField];
+        const currentOdor = row[cond.odorField];
+        const showNotes = currentAppearance != null && currentAppearance > 0;
+        return (
+          <div class="row" style="border-top:1px solid #e5e7eb;padding-top:10px;margin-top:10px;">
+            <div style="flex:1">
+              <label>{cond.label}</label>
+              <div style="display:flex;gap:28px;margin-top:6px;flex-wrap:wrap;">
+                <div>
+                  <span style="font-size:12px;color:#6b7280;">Appearance (외관)</span>
+                  <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+                    {GRADE_LABELS.map((glabel, gvalue) => (
+                      <label style="font-weight:normal;font-size:14px;color:#1a1a1a;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input
+                          type="radio"
+                          name={`${row.id}_${cond.appearanceInputName}`}
+                          value={gvalue}
+                          class="grade-radio"
+                          data-note-target={noteBoxId}
+                          checked={currentAppearance === gvalue}
+                        />
+                        {glabel}
+                      </label>
+                    ))}
+                  </div>
+                  <div
+                    id={noteBoxId}
+                    style={`margin-top:8px;padding:8px 12px;background:#f9fafb;border-radius:6px;${showNotes ? "" : "display:none;"}`}
+                  >
+                    <span style="font-size:12px;color:#6b7280;">특이사항 (해당 항목 선택)</span>
+                    <div style="display:flex;gap:14px;margin-top:4px;">
+                      {REASON_OPTIONS.map((reason) => (
+                        <label style="font-weight:normal;font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                          <input
+                            type="checkbox"
+                            name={`${row.id}_${cond.noteInputName}`}
+                            value={reason}
+                            checked={existingNotes.includes(reason)}
+                          />
+                          {reason}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <span style="font-size:12px;color:#6b7280;">Odor (냄새)</span>
+                  <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+                    {GRADE_LABELS.map((glabel, gvalue) => (
+                      <label style="font-weight:normal;font-size:14px;color:#1a1a1a;display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input
+                          type="radio"
+                          name={`${row.id}_${cond.odorInputName}`}
+                          value={gvalue}
+                          checked={currentOdor === gvalue}
+                        />
+                        {glabel}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {cond.isC25 && (
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                  <div>
+                    <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">pH</label>
+                    <input type="text" name={`${row.id}_ph25c`} value={row.ph25c ?? ""} style="width:80px" />
+                  </div>
+                  <div>
+                    <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">점(경)도</label>
+                    <input
+                      type="text"
+                      name={`${row.id}_viscosity25c`}
+                      value={row.viscosity25c ?? ""}
+                      style="width:80px"
+                    />
+                  </div>
+                  <div>
+                    <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">
+                      Specific gravity
+                    </label>
+                    <input
+                      type="text"
+                      name={`${row.id}_specificGravity25c`}
+                      value={row.specificGravity25c ?? ""}
+                      style="width:80px"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </fieldset>
+  ));
+}
+
 function renderExtra25(ph: string | null, viscosity: string | null, specificGravity: string | null) {
   const parts = [
     ph && `pH ${ph}`,
@@ -237,115 +348,179 @@ adminRoutes.get("/admin", async (c) => {
           </div>
         </form>
         {batchList.length === 0 && <p>{labNoQuery ? "검색 결과가 없습니다." : "등록된 안정도가 없습니다."}</p>}
-        {batchList.map(([batchId, batch]) => {
-          const inProgress = batch.items.some((item) => item.label !== "0일" && !item.acknowledgedAt);
-          return (
-          <div class="stability-batch-card" style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <div>
-                <strong>{batch.productName}</strong>{" "}
-                <span style="color:#6b7280;">· Lab No. {batch.labNo}</span>
+        <div id="batch-list">
+          {batchList.map(([batchId, batch]) => {
+            const inProgress = batch.items.some((item) => item.label !== "0일" && !item.acknowledgedAt);
+            return (
+            <div class="stability-batch-card" data-batch-id={batchId} style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <div>
+                  <strong>{batch.productName}</strong>{" "}
+                  <span style="color:#6b7280;">· Lab No. {batch.labNo}</span>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <a href={`/admin/stability/${batchId}/export`} class="btn-excel">
+                    엑셀 다운로드
+                  </a>
+                  <button type="button" class="btn-edit edit-toggle">수정</button>
+                  <form
+                    class="delete-form"
+                    method="post"
+                    action={`/admin/stability/${batchId}/delete`}
+                    data-confirm={
+                      inProgress ? "아직 안정도 확인이 진행 중인 항목입니다. 정말 삭제하시겠습니까?" : ""
+                    }
+                  >
+                    <button type="submit" class="danger">삭제</button>
+                  </form>
+                </div>
               </div>
-              <div style="display:flex;gap:8px;align-items:center;">
-                <a href={`/admin/stability/${batchId}/export`} class="btn-excel">
-                  엑셀 다운로드
-                </a>
-                <a href={`/admin/stability/${batchId}/edit`} class="btn-edit">
-                  수정
-                </a>
-                <form
-                  class="delete-form"
-                  method="post"
-                  action={`/admin/stability/${batchId}/delete`}
-                  data-confirm={
-                    inProgress ? "아직 안정도 확인이 진행 중인 항목입니다. 정말 삭제하시겠습니까?" : ""
-                  }
-                >
-                  <button type="submit" class="danger">삭제</button>
+
+              <div class="view-panel">
+                <div class="scroll-x">
+                  <table class="stability-table">
+                    <colgroup>
+                      <col style="width:44px" />
+                      <col style="width:64px" />
+                      {CONDITIONS.map(() => (
+                        <col />
+                      ))}
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th>구간</th>
+                        <th>예정(KST)</th>
+                        {CONDITIONS.map((cond) => (
+                          <th>{cond.label}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {batch.items.map((item) => (
+                        <tr>
+                          <td>{segmentLabel(item.label)}</td>
+                          <td>
+                            <div>{shortDate(item.targetDate)}</div>
+                            <div style="font-size:11px;color:#6b7280;">
+                              {String(item.targetHour).padStart(2, "0")}:{String(item.targetMinute).padStart(2, "0")}
+                            </div>
+                          </td>
+                          {CONDITIONS.map((cond) => (
+                            <td>
+                              <div style="margin-bottom:2px;">
+                                <div style="font-size:10px;color:#9ca3af;line-height:1.3;">외관</div>
+                                <div>{renderGrade(item[cond.appearanceField], item[cond.noteField])}</div>
+                              </div>
+                              <div>
+                                <div style="font-size:10px;color:#9ca3af;line-height:1.3;">냄새</div>
+                                <div>{renderOdor(item[cond.odorField])}</div>
+                              </div>
+                              {cond.isC25 && renderExtra25(item.ph25c, item.viscosity25c, item.specificGravity25c)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <form method="post" action={`/admin/stability/${batchId}/conclusion`} class="row" style="margin-top:12px;">
+                  <div style="flex:1">
+                    <label>결론 한 줄 평 (엑셀 Conclusion에 반영)</label>
+                    <input
+                      type="text"
+                      name="conclusion"
+                      value={batch.items[0]?.conclusion ?? ""}
+                      style="width:100%"
+                    />
+                  </div>
+                  <div style="display:flex;align-items:flex-end;">
+                    <button type="submit" class="secondary">저장</button>
+                  </div>
+                </form>
+              </div>
+
+              <div class="edit-panel" style="display:none;margin-top:8px;">
+                <form class="edit-form" method="post" action={`/admin/stability/${batchId}/edit`}>
+                  {renderEditFieldsets(batch.items)}
+                  <div class="row">
+                    <button type="submit">저장</button>
+                    <button type="button" class="secondary edit-cancel">취소</button>
+                  </div>
                 </form>
               </div>
             </div>
-            <div class="scroll-x">
-              <table class="stability-table">
-                <colgroup>
-                  <col style="width:44px" />
-                  <col style="width:64px" />
-                  {CONDITIONS.map(() => (
-                    <col />
-                  ))}
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th>구간</th>
-                    <th>예정(KST)</th>
-                    {CONDITIONS.map((cond) => (
-                      <th>{cond.label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {batch.items.map((item) => (
-                    <tr>
-                      <td>{segmentLabel(item.label)}</td>
-                      <td>
-                        <div>{shortDate(item.targetDate)}</div>
-                        <div style="font-size:11px;color:#6b7280;">
-                          {String(item.targetHour).padStart(2, "0")}:{String(item.targetMinute).padStart(2, "0")}
-                        </div>
-                      </td>
-                      {CONDITIONS.map((cond) => (
-                        <td>
-                          <div style="margin-bottom:2px;">
-                            <div style="font-size:10px;color:#9ca3af;line-height:1.3;">외관</div>
-                            <div>{renderGrade(item[cond.appearanceField], item[cond.noteField])}</div>
-                          </div>
-                          <div>
-                            <div style="font-size:10px;color:#9ca3af;line-height:1.3;">냄새</div>
-                            <div>{renderOdor(item[cond.odorField])}</div>
-                          </div>
-                          {cond.isC25 && renderExtra25(item.ph25c, item.viscosity25c, item.specificGravity25c)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <form method="post" action={`/admin/stability/${batchId}/conclusion`} class="row" style="margin-top:12px;">
-              <div style="flex:1">
-                <label>결론 한 줄 평 (엑셀 Conclusion에 반영)</label>
-                <input
-                  type="text"
-                  name="conclusion"
-                  value={batch.items[0]?.conclusion ?? ""}
-                  style="width:100%"
-                />
-              </div>
-              <div style="display:flex;align-items:flex-end;">
-                <button type="submit" class="secondary">저장</button>
-              </div>
-            </form>
-          </div>
-          );
-        })}
+            );
+          })}
+        </div>
         <script>
           {raw(`
-          document.querySelectorAll('.delete-form').forEach(function (form) {
-            form.addEventListener('submit', function (e) {
-              e.preventDefault();
-              var msg = form.getAttribute('data-confirm');
-              if (msg && !confirm(msg)) return;
-              fetch(form.action, { method: 'POST' })
-                .then(function (res) {
-                  if (!res.ok) throw new Error('delete failed');
-                  var card = form.closest('.stability-batch-card');
-                  if (card) card.remove();
-                })
-                .catch(function () {
-                  alert('삭제에 실패했습니다. 다시 시도해주세요.');
+          var batchList = document.getElementById('batch-list');
+          if (batchList) {
+            function refreshCard(card) {
+              var batchId = card.getAttribute('data-batch-id');
+              fetch('/admin')
+                .then(function (res) { return res.text(); })
+                .then(function (html) {
+                  var doc = new DOMParser().parseFromString(html, 'text/html');
+                  var fresh = doc.querySelector('.stability-batch-card[data-batch-id="' + batchId + '"]');
+                  if (fresh) card.replaceWith(fresh);
                 });
+            }
+
+            batchList.addEventListener('click', function (e) {
+              var toggleBtn = e.target.closest('.edit-toggle');
+              if (toggleBtn) {
+                var card = toggleBtn.closest('.stability-batch-card');
+                card.querySelector('.view-panel').style.display = 'none';
+                card.querySelector('.edit-panel').style.display = 'block';
+                return;
+              }
+              var cancelBtn = e.target.closest('.edit-cancel');
+              if (cancelBtn) {
+                var card2 = cancelBtn.closest('.stability-batch-card');
+                card2.querySelector('.edit-panel').style.display = 'none';
+                card2.querySelector('.view-panel').style.display = 'block';
+              }
             });
-          });
+
+            batchList.addEventListener('change', function (e) {
+              if (!e.target.classList || !e.target.classList.contains('grade-radio')) return;
+              var box = document.getElementById(e.target.getAttribute('data-note-target'));
+              if (!box) return;
+              box.style.display = e.target.value === '0' ? 'none' : 'block';
+            });
+
+            batchList.addEventListener('submit', function (e) {
+              var form = e.target;
+              if (form.classList.contains('delete-form')) {
+                e.preventDefault();
+                var msg = form.getAttribute('data-confirm');
+                if (msg && !confirm(msg)) return;
+                fetch(form.action, { method: 'POST' })
+                  .then(function (res) {
+                    if (!res.ok) throw new Error('delete failed');
+                    var card = form.closest('.stability-batch-card');
+                    if (card) card.remove();
+                  })
+                  .catch(function () {
+                    alert('삭제에 실패했습니다. 다시 시도해주세요.');
+                  });
+                return;
+              }
+              if (form.classList.contains('edit-form')) {
+                e.preventDefault();
+                var card3 = form.closest('.stability-batch-card');
+                fetch(form.action, { method: 'POST', body: new URLSearchParams(new FormData(form)) })
+                  .then(function (res) {
+                    if (!res.ok) throw new Error('save failed');
+                    refreshCard(card3);
+                  })
+                  .catch(function () {
+                    alert('저장에 실패했습니다. 다시 시도해주세요.');
+                  });
+              }
+            });
+          }
         `)}
         </script>
       </div>
@@ -471,160 +646,6 @@ adminRoutes.get("/admin/stability/:batchId/export", async (c) => {
       "Content-Disposition": `attachment; filename="stability.xlsx"; filename*=UTF-8''${encodeURIComponent(filename)}`,
     },
   });
-});
-
-adminRoutes.get("/admin/stability/:batchId/edit", async (c) => {
-  const db = drizzle(c.env.DB);
-  const batchId = c.req.param("batchId");
-  const rows = await db
-    .select()
-    .from(stabilitySchedules)
-    .where(eq(stabilitySchedules.batchId, batchId))
-    .orderBy(stabilitySchedules.id);
-
-  if (rows.length === 0) {
-    return c.html(
-      <Layout title="안정도 수정">
-        <div class="card">존재하지 않는 안정도입니다.</div>
-      </Layout>
-    );
-  }
-
-  return c.html(
-    <Layout title="안정도 수정">
-      <div class="card">
-        <h2>안정도 수정</h2>
-        <p>
-          <strong>{rows[0].productName}</strong> · Lab No. {rows[0].labNo}
-        </p>
-        <form method="post" action={`/admin/stability/${batchId}/edit`}>
-          {rows.map((row) => (
-            <fieldset>
-              <legend>
-                {segmentLabel(row.label)} ({row.targetDate})
-              </legend>
-              {CONDITIONS.map((cond) => {
-                const existingNotes = (row[cond.noteField] ?? "").split(",").filter(Boolean);
-                const noteBoxId = `note_${row.id}_${cond.appearanceInputName}`;
-                const currentAppearance = row[cond.appearanceField];
-                const currentOdor = row[cond.odorField];
-                const showNotes = currentAppearance != null && currentAppearance > 0;
-                return (
-                  <div class="row" style="border-top:1px solid #e5e7eb;padding-top:10px;margin-top:10px;">
-                    <div style="flex:1">
-                      <label>{cond.label}</label>
-                      <div style="display:flex;gap:28px;margin-top:6px;flex-wrap:wrap;">
-                        <div>
-                          <span style="font-size:12px;color:#6b7280;">Appearance (외관)</span>
-                          <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
-                            {GRADE_LABELS.map((glabel, gvalue) => (
-                              <label style="font-weight:normal;font-size:14px;color:#1a1a1a;display:flex;align-items:center;gap:8px;cursor:pointer;">
-                                <input
-                                  type="radio"
-                                  name={`${row.id}_${cond.appearanceInputName}`}
-                                  value={gvalue}
-                                  class="grade-radio"
-                                  data-note-target={noteBoxId}
-                                  checked={currentAppearance === gvalue}
-                                />
-                                {glabel}
-                              </label>
-                            ))}
-                          </div>
-                          <div
-                            id={noteBoxId}
-                            style={`margin-top:8px;padding:8px 12px;background:#f9fafb;border-radius:6px;${showNotes ? "" : "display:none;"}`}
-                          >
-                            <span style="font-size:12px;color:#6b7280;">특이사항 (해당 항목 선택)</span>
-                            <div style="display:flex;gap:14px;margin-top:4px;">
-                              {REASON_OPTIONS.map((reason) => (
-                                <label style="font-weight:normal;font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;">
-                                  <input
-                                    type="checkbox"
-                                    name={`${row.id}_${cond.noteInputName}`}
-                                    value={reason}
-                                    checked={existingNotes.includes(reason)}
-                                  />
-                                  {reason}
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                        <div>
-                          <span style="font-size:12px;color:#6b7280;">Odor (냄새)</span>
-                          <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
-                            {GRADE_LABELS.map((glabel, gvalue) => (
-                              <label style="font-weight:normal;font-size:14px;color:#1a1a1a;display:flex;align-items:center;gap:8px;cursor:pointer;">
-                                <input
-                                  type="radio"
-                                  name={`${row.id}_${cond.odorInputName}`}
-                                  value={gvalue}
-                                  checked={currentOdor === gvalue}
-                                />
-                                {glabel}
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                      {cond.isC25 && (
-                        <div style="display:flex;gap:8px;margin-top:8px;">
-                          <div>
-                            <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">pH</label>
-                            <input type="text" name={`${row.id}_ph25c`} value={row.ph25c ?? ""} style="width:80px" />
-                          </div>
-                          <div>
-                            <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">
-                              점(경)도
-                            </label>
-                            <input
-                              type="text"
-                              name={`${row.id}_viscosity25c`}
-                              value={row.viscosity25c ?? ""}
-                              style="width:80px"
-                            />
-                          </div>
-                          <div>
-                            <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">
-                              Specific gravity
-                            </label>
-                            <input
-                              type="text"
-                              name={`${row.id}_specificGravity25c`}
-                              value={row.specificGravity25c ?? ""}
-                              style="width:80px"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </fieldset>
-          ))}
-          <div class="row">
-            <button type="submit">저장</button>
-            <a href="/admin" style="align-self:center;">
-              취소
-            </a>
-          </div>
-        </form>
-        <script>
-          {raw(`
-          document.querySelectorAll('.grade-radio').forEach(function (radio) {
-            radio.addEventListener('change', function () {
-              var box = document.getElementById(this.getAttribute('data-note-target'));
-              if (!box) return;
-              box.style.display = this.value === '0' ? 'none' : 'block';
-            });
-          });
-        `)}
-        </script>
-      </div>
-    </Layout>
-  );
 });
 
 adminRoutes.post("/admin/stability/:batchId/edit", async (c) => {
