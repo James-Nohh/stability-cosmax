@@ -109,6 +109,12 @@ function segmentLabel(label: string): string {
   return SEGMENT_LABELS[label] ?? label;
 }
 
+// "2026-09-18" -> "09/18" (표는 항상 같은 배치를 보여주므로 연도는 생략)
+function shortDate(dateStr: string): string {
+  const parts = dateStr.split("-");
+  return parts.length === 3 ? `${parts[1]}/${parts[2]}` : dateStr;
+}
+
 const ALERT_GRADES = new Set([2, 3]);
 
 function renderGrade(grade: number | null, note: string | null) {
@@ -248,11 +254,18 @@ adminRoutes.get("/admin", async (c) => {
               </div>
             </div>
             <div class="scroll-x">
-              <table>
+              <table class="stability-table">
+                <colgroup>
+                  <col style="width:44px" />
+                  <col style="width:64px" />
+                  {CONDITIONS.map(() => (
+                    <col />
+                  ))}
+                </colgroup>
                 <thead>
                   <tr>
                     <th>구간</th>
-                    <th>예정 시각(KST)</th>
+                    <th>예정(KST)</th>
                     {CONDITIONS.map((cond) => (
                       <th>{cond.label}</th>
                     ))}
@@ -263,18 +276,20 @@ adminRoutes.get("/admin", async (c) => {
                     <tr>
                       <td>{segmentLabel(item.label)}</td>
                       <td>
-                        {item.targetDate} {String(item.targetHour).padStart(2, "0")}:
-                        {String(item.targetMinute).padStart(2, "0")}
+                        <div>{shortDate(item.targetDate)}</div>
+                        <div style="font-size:11px;color:#6b7280;">
+                          {String(item.targetHour).padStart(2, "0")}:{String(item.targetMinute).padStart(2, "0")}
+                        </div>
                       </td>
                       {CONDITIONS.map((cond) => (
                         <td>
-                          <div>
-                            <span style="font-size:11px;color:#6b7280;">외관</span>{" "}
-                            {renderGrade(item[cond.appearanceField], item[cond.noteField])}
+                          <div style="margin-bottom:2px;">
+                            <div style="font-size:10px;color:#9ca3af;line-height:1.3;">외관</div>
+                            <div>{renderGrade(item[cond.appearanceField], item[cond.noteField])}</div>
                           </div>
                           <div>
-                            <span style="font-size:11px;color:#6b7280;">냄새</span>{" "}
-                            {renderOdor(item[cond.odorField])}
+                            <div style="font-size:10px;color:#9ca3af;line-height:1.3;">냄새</div>
+                            <div>{renderOdor(item[cond.odorField])}</div>
                           </div>
                           {cond.isC25 && renderExtra25(item.ph25c, item.viscosity25c, item.specificGravity25c)}
                         </td>

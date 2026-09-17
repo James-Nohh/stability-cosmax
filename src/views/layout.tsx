@@ -21,6 +21,8 @@ export const Layout: FC<PropsWithChildren<{ title: string; showNav?: boolean }>>
         .card { background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,.1); margin-bottom: 20px; }
         table { width: 100%; border-collapse: collapse; }
         th, td { text-align: left; padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 14px; vertical-align: top; }
+        table.stability-table { table-layout: fixed; }
+        table.stability-table th, table.stability-table td { padding: 6px 4px; word-break: keep-all; }
         input, button { font-size: 14px; padding: 8px; border-radius: 4px; border: 1px solid #d1d5db; }
         button { height: 36px; background: #2563eb; color: #fff; border: none; cursor: pointer; }
         button.danger { background: #dc2626; }
