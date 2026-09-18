@@ -656,7 +656,10 @@ adminRoutes.post("/admin/stability/:batchId/edit", async (c) => {
     .where(eq(stabilitySchedules.batchId, batchId));
 
   function parseGrade(raw: unknown): number | null {
-    const parsed = typeof raw === "string" ? Number(raw) : NaN;
+    // 빈 문자열도 Number('')는 0이 되어버리므로 반드시 먼저 걸러내야 합니다.
+    // (아직 입력하지 않은 미래 구간까지 0으로 저장되는 버그의 원인이었음)
+    if (typeof raw !== "string" || raw.trim() === "") return null;
+    const parsed = Number(raw);
     return Number.isInteger(parsed) && parsed >= 0 && parsed <= 3 ? parsed : null;
   }
 
@@ -893,7 +896,8 @@ adminRoutes.post("/ack/:id", async (c) => {
   const body = await c.req.parseBody({ all: true });
 
   function parseGrade(raw: unknown): number | null {
-    const parsed = typeof raw === "string" ? Number(raw) : NaN;
+    if (typeof raw !== "string" || raw.trim() === "") return null;
+    const parsed = Number(raw);
     return Number.isInteger(parsed) && parsed >= 0 && parsed <= 3 ? parsed : null;
   }
 
