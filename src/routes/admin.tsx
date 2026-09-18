@@ -149,6 +149,7 @@ function renderEditFieldsets(rows: Schedule[]) {
       {CONDITIONS.map((cond) => {
         const currentAppearance = row[cond.appearanceField];
         const currentOdor = row[cond.odorField];
+        const existingNotes = (row[cond.noteField] ?? "").split(",").filter(Boolean);
         return (
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:6px 0;border-top:1px solid #e5e7eb;">
             <div style="width:44px;font-size:13px;font-weight:600;">{cond.label}</div>
@@ -163,6 +164,19 @@ function renderEditFieldsets(rows: Schedule[]) {
                 value={currentAppearance ?? ""}
                 style="width:56px"
               />
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              {REASON_OPTIONS.map((reason) => (
+                <label style="font-weight:normal;font-size:12px;color:#4b5563;display:flex;align-items:center;gap:3px;cursor:pointer;">
+                  <input
+                    type="checkbox"
+                    name={`${row.id}_${cond.noteInputName}`}
+                    value={reason}
+                    checked={existingNotes.includes(reason)}
+                  />
+                  {reason}
+                </label>
+              ))}
             </div>
             <div style="display:flex;align-items:center;gap:4px;">
               <label style="font-size:11px;color:#6b7280;">냄새</label>
@@ -629,8 +643,13 @@ adminRoutes.post("/admin/stability/:batchId/edit", async (c) => {
       const appearanceGrade = parseGrade(body[`${row.id}_${cond.appearanceInputName}`]);
       values[cond.appearanceField] = appearanceGrade;
       values[cond.odorField] = parseGrade(body[`${row.id}_${cond.odorInputName}`]);
-      // 이 수정 폼에는 분리/변색 체크박스가 없어서, 등급>0이면 사유를 자동으로 둘 다 기록합니다.
-      values[cond.noteField] = appearanceGrade && appearanceGrade > 0 ? REASON_OPTIONS.join(",") : null;
+
+      const noteRaw = body[`${row.id}_${cond.noteInputName}`];
+      const notes = (Array.isArray(noteRaw) ? noteRaw : noteRaw ? [noteRaw] : [])
+        .map(String)
+        .filter((n) => REASON_OPTIONS.includes(n));
+      values[cond.noteField] =
+        appearanceGrade && appearanceGrade > 0 && notes.length > 0 ? notes.join(",") : null;
     }
 
     const ph25c = body[`${row.id}_ph25c`];
