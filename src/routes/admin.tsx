@@ -138,6 +138,8 @@ function renderOdor(grade: number | null) {
 
 // 배치의 각 구간(0일~3개월)을 등급/25℃ 값 입력 필드로 렌더링합니다.
 // /admin 목록의 인라인 "수정" 패널에서 사용합니다.
+// 등급 숫자와 25℃ 측정값만 입력받는 압축된 수정 폼. 분리/변색 사유는 체크박스 없이
+// 등급>0이면 자동으로 둘 다 기록합니다 (한 줄씩 보이도록 세로 길이를 줄이기 위함).
 function renderEditFieldsets(rows: Schedule[]) {
   return rows.map((row) => (
     <fieldset>
@@ -145,95 +147,61 @@ function renderEditFieldsets(rows: Schedule[]) {
         {segmentLabel(row.label)} ({row.targetDate})
       </legend>
       {CONDITIONS.map((cond) => {
-        const existingNotes = (row[cond.noteField] ?? "").split(",").filter(Boolean);
-        const noteBoxId = `note_${row.id}_${cond.appearanceInputName}`;
         const currentAppearance = row[cond.appearanceField];
         const currentOdor = row[cond.odorField];
-        const showNotes = currentAppearance != null && currentAppearance > 0;
         return (
-          <div class="row" style="border-top:1px solid #e5e7eb;padding-top:10px;margin-top:10px;">
-            <div style="flex:1">
-              <label>{cond.label}</label>
-              <div style="display:flex;gap:20px;margin-top:6px;flex-wrap:wrap;align-items:flex-start;">
-                <div>
-                  <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">
-                    Appearance (외관, 0~3)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="3"
-                    step="1"
-                    name={`${row.id}_${cond.appearanceInputName}`}
-                    value={currentAppearance ?? ""}
-                    class="grade-input"
-                    data-note-target={noteBoxId}
-                    style="width:70px"
-                  />
-                  <div
-                    id={noteBoxId}
-                    style={`margin-top:8px;padding:8px 12px;background:#f9fafb;border-radius:6px;${showNotes ? "" : "display:none;"}`}
-                  >
-                    <span style="font-size:12px;color:#6b7280;">특이사항 (해당 항목 선택)</span>
-                    <div style="display:flex;gap:14px;margin-top:4px;">
-                      {REASON_OPTIONS.map((reason) => (
-                        <label style="font-weight:normal;font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;">
-                          <input
-                            type="checkbox"
-                            name={`${row.id}_${cond.noteInputName}`}
-                            value={reason}
-                            checked={existingNotes.includes(reason)}
-                          />
-                          {reason}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">
-                    Odor (냄새, 0~3)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="3"
-                    step="1"
-                    name={`${row.id}_${cond.odorInputName}`}
-                    value={currentOdor ?? ""}
-                    style="width:70px"
-                  />
-                </div>
-              </div>
-              {cond.isC25 && (
-                <div style="display:flex;gap:8px;margin-top:8px;">
-                  <div>
-                    <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">pH</label>
-                    <input type="text" name={`${row.id}_ph25c`} value={row.ph25c ?? ""} style="width:80px" />
-                  </div>
-                  <div>
-                    <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">점(경)도</label>
-                    <input
-                      type="text"
-                      name={`${row.id}_viscosity25c`}
-                      value={row.viscosity25c ?? ""}
-                      style="width:80px"
-                    />
-                  </div>
-                  <div>
-                    <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:2px;">
-                      Specific gravity
-                    </label>
-                    <input
-                      type="text"
-                      name={`${row.id}_specificGravity25c`}
-                      value={row.specificGravity25c ?? ""}
-                      style="width:80px"
-                    />
-                  </div>
-                </div>
-              )}
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:6px 0;border-top:1px solid #e5e7eb;">
+            <div style="width:44px;font-size:13px;font-weight:600;">{cond.label}</div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="font-size:11px;color:#6b7280;">외관</label>
+              <input
+                type="number"
+                min="0"
+                max="3"
+                step="1"
+                name={`${row.id}_${cond.appearanceInputName}`}
+                value={currentAppearance ?? ""}
+                style="width:56px"
+              />
             </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <label style="font-size:11px;color:#6b7280;">냄새</label>
+              <input
+                type="number"
+                min="0"
+                max="3"
+                step="1"
+                name={`${row.id}_${cond.odorInputName}`}
+                value={currentOdor ?? ""}
+                style="width:56px"
+              />
+            </div>
+            {cond.isC25 && (
+              <>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <label style="font-size:11px;color:#6b7280;">pH</label>
+                  <input type="text" name={`${row.id}_ph25c`} value={row.ph25c ?? ""} style="width:70px" />
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <label style="font-size:11px;color:#6b7280;">점(경)도</label>
+                  <input
+                    type="text"
+                    name={`${row.id}_viscosity25c`}
+                    value={row.viscosity25c ?? ""}
+                    style="width:70px"
+                  />
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <label style="font-size:11px;color:#6b7280;">비중</label>
+                  <input
+                    type="text"
+                    name={`${row.id}_specificGravity25c`}
+                    value={row.specificGravity25c ?? ""}
+                    style="width:70px"
+                  />
+                </div>
+              </>
+            )}
           </div>
         );
       })}
@@ -479,14 +447,6 @@ adminRoutes.get("/admin", async (c) => {
               }
             });
 
-            batchList.addEventListener('input', function (e) {
-              if (!e.target.classList || !e.target.classList.contains('grade-input')) return;
-              var box = document.getElementById(e.target.getAttribute('data-note-target'));
-              if (!box) return;
-              var n = parseInt(e.target.value, 10);
-              box.style.display = n >= 1 && n <= 3 ? 'block' : 'none';
-            });
-
             batchList.addEventListener('submit', function (e) {
               var form = e.target;
               if (form.classList.contains('delete-form')) {
@@ -669,13 +629,8 @@ adminRoutes.post("/admin/stability/:batchId/edit", async (c) => {
       const appearanceGrade = parseGrade(body[`${row.id}_${cond.appearanceInputName}`]);
       values[cond.appearanceField] = appearanceGrade;
       values[cond.odorField] = parseGrade(body[`${row.id}_${cond.odorInputName}`]);
-
-      const noteRaw = body[`${row.id}_${cond.noteInputName}`];
-      const notes = (Array.isArray(noteRaw) ? noteRaw : noteRaw ? [noteRaw] : [])
-        .map(String)
-        .filter((n) => REASON_OPTIONS.includes(n));
-      values[cond.noteField] =
-        appearanceGrade && appearanceGrade > 0 && notes.length > 0 ? notes.join(",") : null;
+      // 이 수정 폼에는 분리/변색 체크박스가 없어서, 등급>0이면 사유를 자동으로 둘 다 기록합니다.
+      values[cond.noteField] = appearanceGrade && appearanceGrade > 0 ? REASON_OPTIONS.join(",") : null;
     }
 
     const ph25c = body[`${row.id}_ph25c`];
