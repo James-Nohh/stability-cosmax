@@ -7,6 +7,7 @@ import { requireAuth } from "../middleware/auth";
 import { Layout } from "../views/layout";
 import { kstTodayDateOnly, addDays, addMonths, formatDateStr, nowKst } from "../lib/time";
 import { buildR1Workbook } from "../lib/r1export";
+import { APPEARANCE_REASON_OPTIONS, ETC_REASON, parseReasonNote, buildReasonNote, formatReasonNote } from "../lib/reasons";
 import type { Env, Variables } from "../types";
 
 type Schedule = typeof stabilitySchedules.$inferSelect;
@@ -95,8 +96,6 @@ const CONDITIONS = [
   isC25: boolean;
 }[];
 
-const REASON_OPTIONS = ["분리", "변색"];
-
 const SEGMENT_LABELS: Record<string, string> = {
   "0일": "0D",
   "1일": "1D",
@@ -122,11 +121,12 @@ const ALERT_GRADES = new Set([2, 3]);
 function renderGrade(grade: number | null, note: string | null) {
   if (grade == null) return "-";
   const alert = ALERT_GRADES.has(grade);
-  if (!note) return alert ? <span style="color:#dc2626;">{grade}</span> : String(grade);
+  const displayNote = formatReasonNote(note);
+  if (!displayNote) return alert ? <span style="color:#dc2626;">{grade}</span> : String(grade);
   return (
     <span style={alert ? "color:#dc2626;" : undefined}>
       {grade}{" "}
-      <span style={`font-size:11px;${alert ? "color:#dc2626;" : "color:#9ca3af;"}`}>({note})</span>
+      <span style={`font-size:11px;${alert ? "color:#dc2626;" : "color:#9ca3af;"}`}>({displayNote})</span>
     </span>
   );
 }
@@ -361,7 +361,9 @@ adminRoutes.get("/admin", async (c) => {
                               </div>
                             </td>
                             {CONDITIONS.map((cond) => {
-                              const existingNotes = (item[cond.noteField] ?? "").split(",").filter(Boolean);
+                              const { checked: existingNotes, etcChecked, etcText } = parseReasonNote(
+                                item[cond.noteField]
+                              );
                               return (
                                 <td>
                                   <div style="margin-bottom:4px;">
@@ -376,7 +378,7 @@ adminRoutes.get("/admin", async (c) => {
                                       style="width:44px;font-size:12px;padding:2px 4px;"
                                     />
                                     <div style="display:flex;flex-direction:column;margin-top:2px;">
-                                      {REASON_OPTIONS.map((reason) => (
+                                      {APPEARANCE_REASON_OPTIONS.map((reason) => (
                                         <label style="font-weight:normal;font-size:10px;color:#4b5563;display:flex;align-items:center;gap:2px;cursor:pointer;">
                                           <input
                                             type="checkbox"
@@ -388,6 +390,23 @@ adminRoutes.get("/admin", async (c) => {
                                           {reason}
                                         </label>
                                       ))}
+                                      <label style="font-weight:normal;font-size:10px;color:#4b5563;display:flex;align-items:center;gap:2px;cursor:pointer;">
+                                        <input
+                                          type="checkbox"
+                                          name={`${item.id}_${cond.noteInputName}`}
+                                          value={ETC_REASON}
+                                          checked={etcChecked}
+                                          style="width:auto;padding:0;"
+                                        />
+                                        {ETC_REASON}
+                                      </label>
+                                      <input
+                                        type="text"
+                                        name={`${item.id}_${cond.noteInputName}Etc`}
+                                        value={etcText}
+                                        placeholder="직접 입력"
+                                        style="width:60px;font-size:10px;padding:2px 4px;margin-top:2px;"
+                                      />
                                     </div>
                                   </div>
                                   <div>
@@ -660,11 +679,11 @@ adminRoutes.post("/admin/stability/:batchId/edit", async (c) => {
       values[cond.odorField] = parseGrade(body[`${row.id}_${cond.odorInputName}`]);
 
       const noteRaw = body[`${row.id}_${cond.noteInputName}`];
-      const notes = (Array.isArray(noteRaw) ? noteRaw : noteRaw ? [noteRaw] : [])
-        .map(String)
-        .filter((n) => REASON_OPTIONS.includes(n));
-      values[cond.noteField] =
-        appearanceGrade && appearanceGrade > 0 && notes.length > 0 ? notes.join(",") : null;
+      const checkedReasons = (Array.isArray(noteRaw) ? noteRaw : noteRaw ? [noteRaw] : []).map(String);
+      const etcChecked = checkedReasons.includes(ETC_REASON);
+      const etcRaw = body[`${row.id}_${cond.noteInputName}Etc`];
+      const noteValue = buildReasonNote(checkedReasons, etcChecked, typeof etcRaw === "string" ? etcRaw : "");
+      values[cond.noteField] = appearanceGrade && appearanceGrade > 0 ? noteValue : null;
     }
 
     const ph25c = body[`${row.id}_ph25c`];
@@ -772,7 +791,7 @@ adminRoutes.get("/ack/:id", async (c) => {
         <p style="font-size:13px;color:#16a34a;">반복 알람이 해제되었습니다.</p>
         <form method="post" action={`/ack/${id}`}>
           {CONDITIONS.map((cond) => {
-            const existingNotes = (schedule[cond.noteField] ?? "").split(",").filter(Boolean);
+            const { checked: existingNotes, etcChecked, etcText } = parseReasonNote(schedule[cond.noteField]);
             const noteBoxId = `note-${cond.appearanceInputName}`;
             const currentAppearance = schedule[cond.appearanceField];
             const currentOdor = schedule[cond.odorField];
@@ -805,8 +824,8 @@ adminRoutes.get("/ack/:id", async (c) => {
                         style={`margin-top:8px;padding:8px 12px;background:#f9fafb;border-radius:6px;${showNotes ? "" : "display:none;"}`}
                       >
                         <span style="font-size:12px;color:#6b7280;">특이사항 (해당 항목 선택)</span>
-                        <div style="display:flex;gap:14px;margin-top:4px;">
-                          {REASON_OPTIONS.map((reason) => (
+                        <div style="display:flex;gap:14px;margin-top:4px;align-items:center;flex-wrap:wrap;">
+                          {APPEARANCE_REASON_OPTIONS.map((reason) => (
                             <label style="font-weight:normal;font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;">
                               <input
                                 type="checkbox"
@@ -817,6 +836,22 @@ adminRoutes.get("/ack/:id", async (c) => {
                               {reason}
                             </label>
                           ))}
+                          <label style="font-weight:normal;font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                            <input
+                              type="checkbox"
+                              name={cond.noteInputName}
+                              value={ETC_REASON}
+                              checked={etcChecked}
+                            />
+                            {ETC_REASON}
+                          </label>
+                          <input
+                            type="text"
+                            name={`${cond.noteInputName}Etc`}
+                            value={etcText}
+                            placeholder="직접 입력"
+                            style="width:120px"
+                          />
                         </div>
                       </div>
                     </div>
@@ -897,11 +932,11 @@ adminRoutes.post("/ack/:id", async (c) => {
     values[cond.odorField] = parseGrade(body[cond.odorInputName]);
 
     const noteRaw = body[cond.noteInputName];
-    const notes = (Array.isArray(noteRaw) ? noteRaw : noteRaw ? [noteRaw] : [])
-      .map(String)
-      .filter((n) => REASON_OPTIONS.includes(n));
-    values[cond.noteField] =
-      appearanceGrade && appearanceGrade > 0 && notes.length > 0 ? notes.join(",") : null;
+    const checkedReasons = (Array.isArray(noteRaw) ? noteRaw : noteRaw ? [noteRaw] : []).map(String);
+    const etcChecked = checkedReasons.includes(ETC_REASON);
+    const etcRaw = body[`${cond.noteInputName}Etc`];
+    const noteValue = buildReasonNote(checkedReasons, etcChecked, typeof etcRaw === "string" ? etcRaw : "");
+    values[cond.noteField] = appearanceGrade && appearanceGrade > 0 ? noteValue : null;
   }
 
   const ph25c = typeof body.ph25c === "string" ? body.ph25c.trim() : "";

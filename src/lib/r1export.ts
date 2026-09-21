@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import r1Template from "../../assets/r1-template.xlsx";
 import type { stabilitySchedules, users } from "../db/schema";
+import { formatReasonNote } from "./reasons";
 
 type Schedule = typeof stabilitySchedules.$inferSelect;
 type User = typeof users.$inferSelect;
@@ -90,8 +91,8 @@ function setGradeCell(cell: ExcelJS.Cell, grade: number | null, note: string | n
     cell.value = 0;
     return;
   }
-  const reasons = (note ?? "").split(",").filter(Boolean);
-  cell.value = reasons.length > 0 ? `${grade} (${reasons.join(",")})` : grade;
+  const displayNote = formatReasonNote(note);
+  cell.value = displayNote ? `${grade} (${displayNote})` : grade;
 
   if (grade === 2 || grade === 3) {
     detachStyle(cell);
