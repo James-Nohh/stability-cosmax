@@ -163,6 +163,7 @@ const SNOOZE_OPTIONS = [
 adminRoutes.get("/admin", async (c) => {
   const db = drizzle(c.env.DB);
   const labNoQuery = (c.req.query("labNo") ?? "").trim();
+  const todayStr = formatDateStr(kstTodayDateOnly());
   const rows = await db.select().from(stabilitySchedules).orderBy(stabilitySchedules.id);
 
   const batches = new Map<
@@ -242,6 +243,8 @@ adminRoutes.get("/admin", async (c) => {
         <div id="batch-list">
           {batchList.map(([batchId, batch]) => {
             const inProgress = batch.items.some((item) => item.label !== "0일" && !item.acknowledgedAt);
+            // 아직 도래하지 않은 구간은 목록에서 숨겼다가, 예정일이 되면 (미입력 시 "-"로) 표시합니다.
+            const visibleItems = batch.items.filter((item) => item.targetDate <= todayStr);
             return (
             <div class="stability-batch-card" data-batch-id={batchId} style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px;">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
@@ -287,7 +290,7 @@ adminRoutes.get("/admin", async (c) => {
                       </tr>
                     </thead>
                     <tbody>
-                      {batch.items.map((item) => (
+                      {visibleItems.map((item) => (
                         <tr>
                           <td>{segmentLabel(item.label)}</td>
                           <td>
@@ -351,7 +354,7 @@ adminRoutes.get("/admin", async (c) => {
                         </tr>
                       </thead>
                       <tbody>
-                        {batch.items.map((item) => (
+                        {visibleItems.map((item) => (
                           <tr>
                             <td>{segmentLabel(item.label)}</td>
                             <td>
