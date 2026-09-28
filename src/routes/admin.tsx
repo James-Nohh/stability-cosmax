@@ -153,11 +153,10 @@ function renderExtra25(ph: string | null, viscosity: string | null, specificGrav
 }
 
 const SNOOZE_OPTIONS = [
-  { minutes: 30, label: "30분 뒤" },
-  { minutes: 60, label: "1시간 뒤" },
   { minutes: 120, label: "2시간 뒤" },
-  { minutes: 180, label: "3시간 뒤" },
   { minutes: 240, label: "4시간 뒤" },
+  { minutes: 360, label: "6시간 뒤" },
+  { minutes: 1440, label: "24시간 뒤" },
 ];
 
 adminRoutes.get("/admin", async (c) => {
@@ -1011,10 +1010,10 @@ adminRoutes.post("/snooze/:id", async (c) => {
   const db = drizzle(c.env.DB);
   const id = Number(c.req.param("id"));
   const body = await c.req.parseBody();
-  const allowed = new Set(SNOOZE_OPTIONS.map((o) => o.minutes));
   const minutes = Number(body.minutes);
+  const option = SNOOZE_OPTIONS.find((o) => o.minutes === minutes);
 
-  if (allowed.has(minutes)) {
+  if (option) {
     await db
       .update(stabilitySchedules)
       .set({ nextReminderAt: Date.now() + minutes * 60 * 1000, burstReminderCount: 0 })
@@ -1025,7 +1024,7 @@ adminRoutes.post("/snooze/:id", async (c) => {
     <Layout title="나중에">
       <div class="card">
         <h2>알겠습니다</h2>
-        <p>{minutes}분 후 다시 알려드리겠습니다.</p>
+        <p>{option ? `${option.label} 다시 알려드리겠습니다.` : "잘못된 선택입니다."}</p>
         <p>
           <a href="/admin">안정도 관리로 돌아가기</a>
         </p>
