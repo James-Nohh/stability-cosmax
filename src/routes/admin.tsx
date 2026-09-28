@@ -156,7 +156,7 @@ const SNOOZE_OPTIONS = [
   { minutes: 120, label: "2시간 뒤" },
   { minutes: 240, label: "4시간 뒤" },
   { minutes: 360, label: "6시간 뒤" },
-  { minutes: 1440, label: "24시간 뒤" },
+  { minutes: 1440, label: "1일 뒤" },
 ];
 
 adminRoutes.get("/admin", async (c) => {
