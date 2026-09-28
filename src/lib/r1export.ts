@@ -217,34 +217,46 @@ export async function buildR1Workbook(batchRows: Schedule[], user: User): Promis
   ws.getCell("S44").value = null;
   (ws as unknown as { _media: unknown[] })._media = [];
 
-  // 이미지가 있던 자리(R36:Z43)에 점선 파란 테두리 박스만 남기기
+  // 이미지가 있던 자리(R36:Z43)를 Initial / Final 두 칸으로 나눠 점선 파란 테두리 박스를 그립니다.
+  // (R~U, W~Z 각 4열, 가운데 V열은 간격)
   const blue: Partial<ExcelJS.Border> = { style: "dashed", color: { argb: "FF0000FF" } };
   const TOP = 36;
   const BOTTOM = 43;
-  const LEFT = 18; // R
-  const RIGHT = 26; // Z
-  for (let r = TOP; r <= BOTTOM; r++) {
-    for (let c = LEFT; c <= RIGHT; c++) {
-      const cell = ws.getCell(r, c);
-      const border: Partial<Record<keyof ExcelJS.Borders, Partial<ExcelJS.Border>>> = {};
-      if (r === TOP) border.top = blue;
-      if (r === BOTTOM) border.bottom = blue;
-      if (c === LEFT) border.left = blue;
-      if (c === RIGHT) border.right = blue;
-      if (Object.keys(border).length === 0) continue;
-      detachStyle(cell);
-      cell.border = border;
-    }
-  }
+  const LABEL_TOP = 38;
+  const LABEL_BOTTOM = 40;
+  const IMAGE_BOXES = [
+    { left: 18, right: 21, title: "Initial" }, // R~U
+    { left: 23, right: 26, title: "Final" }, // W~Z
+  ];
+  for (const box of IMAGE_BOXES) {
+    // 병합은 테두리보다 먼저 해야 합니다. ExcelJS는 병합 시 마스터 셀 스타일을
+    // 나머지 셀에 복사하므로, 나중에 그리는 테두리가 덮어써지지 않게 합니다.
+    ws.mergeCells(LABEL_TOP, box.left, LABEL_BOTTOM, box.right);
 
-  // 박스 가운데에 "이미지 첨부" 안내 문구
-  const labelStartRow = Math.floor((TOP + BOTTOM) / 2) - 1;
-  ws.mergeCells(labelStartRow, LEFT + 1, labelStartRow + 1, RIGHT - 1);
-  const labelCell = ws.getCell(labelStartRow, LEFT + 1);
-  detachStyle(labelCell);
-  labelCell.value = "이미지 첨부";
-  labelCell.alignment = { horizontal: "center", vertical: "middle" };
-  labelCell.font = { ...labelCell.font, size: 14, color: { argb: "FF0000FF" } };
+    for (let r = TOP; r <= BOTTOM; r++) {
+      for (let c = box.left; c <= box.right; c++) {
+        const cell = ws.getCell(r, c);
+        const border: Partial<Record<keyof ExcelJS.Borders, Partial<ExcelJS.Border>>> = {};
+        if (r === TOP) border.top = blue;
+        if (r === BOTTOM) border.bottom = blue;
+        if (c === box.left) border.left = blue;
+        if (c === box.right) border.right = blue;
+        if (Object.keys(border).length === 0) continue;
+        detachStyle(cell);
+        cell.border = border;
+      }
+    }
+
+    const labelCell = ws.getCell(LABEL_TOP, box.left);
+    detachStyle(labelCell);
+    labelCell.value = {
+      richText: [
+        { text: box.title, font: { bold: true, size: 12, color: { argb: "FF0000FF" } } },
+        { text: "\n이미지 첨부", font: { size: 9, color: { argb: "FF0000FF" } } },
+      ],
+    };
+    labelCell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+  }
 
   // 우측 끝 Remarks 열(AA:AB) — 라벨/내용만 지우고 열 자체는 그대로 둡니다.
   for (let r = 9; r <= 34; r++) {
