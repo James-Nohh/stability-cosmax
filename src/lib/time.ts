@@ -31,3 +31,8 @@ export function addMonths(date: Date, months: number): Date {
 export function formatDateStr(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
+
+// unix ms -> "YYYY-MM-DD HH:mm" (KST)
+export function formatKstDateTime(ms: number): string {
+  return new Date(ms + KST_OFFSET_MS).toISOString().slice(0, 16).replace("T", " ");
+}

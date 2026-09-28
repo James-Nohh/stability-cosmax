@@ -2,10 +2,10 @@ import { Hono } from "hono";
 import { drizzle } from "drizzle-orm/d1";
 import { eq, desc, inArray } from "drizzle-orm";
 import { raw } from "hono/utils/html";
-import { stabilitySchedules, batchLogs } from "../db/schema";
+import { stabilitySchedules, batchLogs, exportLogs, users } from "../db/schema";
 import { requireAuth } from "../middleware/auth";
 import { Layout } from "../views/layout";
-import { kstTodayDateOnly, addDays, addMonths, formatDateStr, nowKst } from "../lib/time";
+import { kstTodayDateOnly, addDays, addMonths, formatDateStr, formatKstDateTime, nowKst } from "../lib/time";
 import { buildR1Workbook } from "../lib/r1export";
 import { APPEARANCE_REASON_OPTIONS, ETC_REASON, parseReasonNote, buildReasonNote, formatReasonNote } from "../lib/reasons";
 import type { Env, Variables } from "../types";
@@ -164,6 +164,22 @@ adminRoutes.get("/admin", async (c) => {
   const labNoQuery = (c.req.query("labNo") ?? "").trim();
   const todayStr = formatDateStr(kstTodayDateOnly());
   const rows = await db.select().from(stabilitySchedules).orderBy(stabilitySchedules.id);
+
+  const exportRows = await db
+    .select({
+      batchId: exportLogs.batchId,
+      downloadedAt: exportLogs.downloadedAt,
+      displayName: users.displayName,
+      username: users.username,
+    })
+    .from(exportLogs)
+    .leftJoin(users, eq(exportLogs.userId, users.id))
+    .orderBy(desc(exportLogs.downloadedAt));
+  const exportsByBatch = new Map<string, typeof exportRows>();
+  for (const log of exportRows) {
+    if (!exportsByBatch.has(log.batchId)) exportsByBatch.set(log.batchId, []);
+    exportsByBatch.get(log.batchId)!.push(log);
+  }
 
   const batches = new Map<
     string,
@@ -330,6 +346,31 @@ adminRoutes.get("/admin", async (c) => {
                     <button type="submit" class="secondary">저장</button>
                   </div>
                 </form>
+                {(() => {
+                  const logs = exportsByBatch.get(batchId) ?? [];
+                  return (
+                    <details style="margin-top:10px;font-size:13px;">
+                      <summary style="cursor:pointer;color:#4b5563;">
+                        엑셀 다운로드 이력 ({logs.length}건)
+                        {logs[0] && (
+                          <span style="color:#9ca3af;"> · 최근 {formatKstDateTime(logs[0].downloadedAt)}</span>
+                        )}
+                      </summary>
+                      {logs.length === 0 ? (
+                        <p style="color:#9ca3af;margin:6px 0 0;">아직 다운로드한 이력이 없습니다.</p>
+                      ) : (
+                        <ul style="margin:6px 0 0;padding-left:18px;color:#374151;">
+                          {logs.map((log) => (
+                            <li>
+                              {formatKstDateTime(log.downloadedAt)}
+                              <span style="color:#9ca3af;"> · {log.displayName || log.username || "-"}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </details>
+                  );
+                })()}
               </div>
 
               <div class="edit-panel" style="display:none;margin-top:8px;">
@@ -614,6 +655,7 @@ adminRoutes.post("/admin/stability/:batchId/delete", async (c) => {
     await db.delete(batchLogs).where(inArray(batchLogs.scheduleId, scheduleIds));
   }
   await db.delete(stabilitySchedules).where(eq(stabilitySchedules.batchId, batchId));
+  await db.delete(exportLogs).where(eq(exportLogs.batchId, batchId));
 
   return c.redirect("/admin");
 });
@@ -642,7 +684,11 @@ adminRoutes.get("/admin/stability/:batchId/export", async (c) => {
     return c.text("존재하지 않는 안정도입니다.", 404);
   }
 
-  const buffer = await buildR1Workbook(rows, c.get("user"));
+  const user = c.get("user");
+  const buffer = await buildR1Workbook(rows, user);
+
+  // 파일 생성에 성공한 경우에만 다운로드 이력으로 남깁니다.
+  await db.insert(exportLogs).values({ batchId, userId: user.id, downloadedAt: Date.now() });
 
   const { productName, labNo } = rows[0];
   const filename = `안정도_${productName}_${labNo}.xlsx`.replace(/[\\/:*?"<>|]/g, "_");

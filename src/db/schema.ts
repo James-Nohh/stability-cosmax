@@ -77,3 +77,11 @@ export const batchLogs = sqliteTable("batch_logs", {
   detail: text("detail"),
   runAt: text("run_at").notNull().default("CURRENT_TIMESTAMP"),
 });
+
+// 배치(제품)별 엑셀 다운로드 이력. 배치 삭제 시 함께 지웁니다.
+export const exportLogs = sqliteTable("export_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  batchId: text("batch_id").notNull(),
+  userId: integer("user_id"),
+  downloadedAt: integer("downloaded_at").notNull(), // unix ms
+});
