@@ -4,6 +4,8 @@ import { and, eq, lte, isNull } from "drizzle-orm";
 import { stabilitySchedules, batchLogs } from "./db/schema";
 import { sendTeamsAlarm } from "./lib/teams";
 import { nowKst } from "./lib/time";
+import { formatReasonNote } from "./lib/reasons";
+import { SEGMENT_ORDER, segmentLabel, ftCycleOf, ftNoticeText } from "./lib/schedule";
 import type { Env } from "./types";
 
 const REMINDER_INTERVAL_MS = 20 * 60 * 1000; // 20분
@@ -12,17 +14,10 @@ const BURST_GAP_MS = 6 * 60 * 60 * 1000; // 그 후 6시간마다 버스트 반�
 
 type Schedule = typeof stabilitySchedules.$inferSelect;
 
-// 구간 순서(경과 시간 순). 알람을 보낼 구간보다 앞선 구간들만 과거 이력으로 취급합니다.
-const SEGMENT_ORDER = ["0일", "1일", "1주", "2주", "1개월", "2개월", "3개월"];
-const SEGMENT_LABELS: Record<string, string> = {
-  "0일": "0D",
-  "1일": "1D",
-  "1주": "1W",
-  "2주": "2W",
-  "1개월": "1M",
-  "2개월": "2M",
-  "3개월": "3M",
-};
+// 이 구간에 입력할 안정도 항목이 있는지. 없으면(예: F/T 냉동 종료만 있는 5일) 알림만 1회 보냅니다.
+function hasCheckItems(s: Schedule): boolean {
+  return s.mainCheck || s.cycCycle != null || ftCycleOf(s.ftStep) != null;
+}
 
 const CONDITION_DEFS: {
   label: string;
@@ -40,6 +35,8 @@ const CONDITION_DEFS: {
     odorField: "gradeOdorSunlight",
     noteField: "noteAppearanceSunlight",
   },
+  { label: "F/T", appearanceField: "gradeAppearanceFt", odorField: "gradeOdorFt", noteField: "noteAppearanceFt" },
+  { label: "Cyc", appearanceField: "gradeAppearanceCyc", odorField: "gradeOdorCyc", noteField: "noteAppearanceCyc" },
 ];
 
 // 이전 구간들 중 등급 1(적합·특이사항 있음)이 기록된 조건이 있으면 주의 문구를 만듭니다.
@@ -58,12 +55,12 @@ async function buildCautionText(db: DrizzleD1Database, schedule: Schedule): Prom
   const lines: string[] = [];
   for (const row of rows) {
     if (!priorLabels.has(row.label)) continue;
-    const segLabel = SEGMENT_LABELS[row.label] ?? row.label;
+    const segLabel = segmentLabel(row.label);
     for (const cond of CONDITION_DEFS) {
       const appearanceGrade = row[cond.appearanceField] as number | null;
       const odorGrade = row[cond.odorField] as number | null;
       if (!isIssueGrade(appearanceGrade) && !isIssueGrade(odorGrade)) continue;
-      const note = row[cond.noteField] as string | null;
+      const note = formatReasonNote(row[cond.noteField] as string | null);
       const appearanceText = note ? `${appearanceGrade} (${note})` : String(appearanceGrade ?? "-");
       const odorText = odorGrade == null ? "-" : String(odorGrade);
       lines.push(`${segLabel}, ${cond.label}, 외관 ${appearanceText}, 냄새 ${odorText} 발생. 안정도 주의 요망`);
@@ -93,9 +90,16 @@ export async function runDueAlarms(env: Env) {
 
   for (const schedule of initialDue) {
     await sendAndLog(env, db, schedule);
+    // 입력할 항목이 없는 알림 전용 구간은 반복 알람 없이 바로 확인 처리합니다.
+    const noticeOnly = !hasCheckItems(schedule);
     await db
       .update(stabilitySchedules)
-      .set({ sent: true, nextReminderAt: nowMs + REMINDER_INTERVAL_MS, burstReminderCount: 0 })
+      .set({
+        sent: true,
+        nextReminderAt: noticeOnly ? null : nowMs + REMINDER_INTERVAL_MS,
+        burstReminderCount: 0,
+        ...(noticeOnly ? { acknowledgedAt: nowMs } : {}),
+      })
       .where(eq(stabilitySchedules.id, schedule.id));
   }
 
@@ -129,16 +133,29 @@ export async function runDueAlarms(env: Env) {
 
 async function sendAndLog(env: Env, db: DrizzleD1Database, schedule: Schedule) {
   const title = `[안정도 알람] ${schedule.productName}`;
-  let message = `Lab No. ${schedule.labNo}\n\n안정도를 확인하세요 (${schedule.label} 경과)`;
+  const checkItems = hasCheckItems(schedule);
+  const parts = [`Lab No. ${schedule.labNo}`];
 
-  const caution = await buildCautionText(db, schedule);
-  if (caution) {
-    message += `\n\n⚠️\n\n${caution}`;
+  // 같은 시각에 끝나는 조건들은 알람 하나로 합쳐서 보냅니다.
+  if (checkItems) {
+    const items: string[] = [];
+    if (schedule.mainCheck) items.push("4℃ / 25℃ / 37℃ / 45℃ / 일광");
+    if (schedule.cycCycle != null) items.push(`Cyc ${schedule.cycCycle}싸이클`);
+    const ftCycle = ftCycleOf(schedule.ftStep);
+    if (ftCycle != null) items.push(`F/T ${ftCycle}싸이클`);
+    parts.push(`안정도를 확인하세요 (${schedule.label} 경과)\n\n확인 항목: ${items.join(", ")}`);
   }
 
+  const ftNotice = ftNoticeText(schedule.ftStep);
+  if (ftNotice) parts.push(ftNotice);
+
+  const caution = checkItems ? await buildCautionText(db, schedule) : null;
+  if (caution) parts.push(`⚠️\n\n${caution}`);
+
+  const message = parts.join("\n\n");
   const results = await Promise.allSettled([
-    sendTeamsAlarm(env.TEAMS_WEBHOOK_URL, title, message, schedule.id),
-    sendTeamsAlarm(env.TEAMS_WEBHOOK_URL_DM, title, message, schedule.id),
+    sendTeamsAlarm(env.TEAMS_WEBHOOK_URL, title, message, schedule.id, checkItems),
+    sendTeamsAlarm(env.TEAMS_WEBHOOK_URL_DM, title, message, schedule.id, checkItems),
   ]);
   const failures = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
 

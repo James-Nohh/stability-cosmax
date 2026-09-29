@@ -8,6 +8,7 @@ import { Layout } from "../views/layout";
 import { kstTodayDateOnly, addDays, addMonths, formatDateStr, formatKstDateTime, nowKst } from "../lib/time";
 import { buildR1Workbook } from "../lib/r1export";
 import { APPEARANCE_REASON_OPTIONS, ETC_REASON, parseReasonNote, buildReasonNote, formatReasonNote } from "../lib/reasons";
+import { CHECKPOINTS, FT_TOTAL_CYCLES, segmentLabel, ftCycleOf, ftNoticeText } from "../lib/schedule";
 import type { Env, Variables } from "../types";
 
 type Schedule = typeof stabilitySchedules.$inferSelect;
@@ -15,15 +16,6 @@ type Schedule = typeof stabilitySchedules.$inferSelect;
 export const adminRoutes = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 adminRoutes.use("*", requireAuth);
-
-const CHECKPOINTS: { label: string; addDays?: number; addMonths?: number }[] = [
-  { label: "1일", addDays: 1 },
-  { label: "1주", addDays: 7 },
-  { label: "2주", addDays: 14 },
-  { label: "1개월", addMonths: 1 },
-  { label: "2개월", addMonths: 2 },
-  { label: "3개월", addMonths: 3 },
-];
 
 const GRADE_LABELS = [
   "0 - 적합",
@@ -96,18 +88,36 @@ const CONDITIONS = [
   isC25: boolean;
 }[];
 
-const SEGMENT_LABELS: Record<string, string> = {
-  "0일": "0D",
-  "1일": "1D",
-  "1주": "1W",
-  "2주": "2W",
-  "1개월": "1M",
-  "2개월": "2M",
-  "3개월": "3M",
-};
+const FT_CONDITION = {
+  label: "F/T",
+  appearanceField: "gradeAppearanceFt",
+  appearanceInputName: "gradeAppearanceFt",
+  odorField: "gradeOdorFt",
+  odorInputName: "gradeOdorFt",
+  noteField: "noteAppearanceFt",
+  noteInputName: "noteAppearanceFt",
+  isC25: false,
+} as const;
 
-function segmentLabel(label: string): string {
-  return SEGMENT_LABELS[label] ?? label;
+const CYC_CONDITION = {
+  label: "Cyc",
+  appearanceField: "gradeAppearanceCyc",
+  appearanceInputName: "gradeAppearanceCyc",
+  odorField: "gradeOdorCyc",
+  odorInputName: "gradeOdorCyc",
+  noteField: "noteAppearanceCyc",
+  noteInputName: "noteAppearanceCyc",
+  isC25: false,
+} as const;
+
+type Condition = (typeof CONDITIONS)[number] | typeof FT_CONDITION | typeof CYC_CONDITION;
+
+// 한 구간에서 확인해야 하는 조건들 (알람이 겹치는 구간은 한 화면에서 함께 입력)
+function conditionsFor(row: Schedule): Condition[] {
+  const list: Condition[] = row.mainCheck ? [...CONDITIONS] : [];
+  if (row.cycCycle != null) list.push(CYC_CONDITION);
+  if (ftCycleOf(row.ftStep) != null) list.push(FT_CONDITION);
+  return list;
 }
 
 // "2026-09-18" -> "09/18" (표는 항상 같은 배치를 보여주므로 연도는 생략)
@@ -148,6 +158,164 @@ function renderExtra25(ph: string | null, viscosity: string | null, specificGrav
       {parts.map((part) => (
         <div>{part}</div>
       ))}
+    </div>
+  );
+}
+
+function renderViewCell(item: Schedule, cond: Condition) {
+  return (
+    <>
+      <div style="margin-bottom:2px;">
+        <div style="font-size:10px;color:#9ca3af;line-height:1.3;">외관</div>
+        <div>{renderGrade(item[cond.appearanceField], item[cond.noteField])}</div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:#9ca3af;line-height:1.3;">냄새</div>
+        <div>{renderOdor(item[cond.odorField])}</div>
+      </div>
+      {cond.isC25 && renderExtra25(item.ph25c, item.viscosity25c, item.specificGravity25c)}
+    </>
+  );
+}
+
+function renderEditCell(item: Schedule, cond: Condition) {
+  const { checked: existingNotes, etcChecked, etcText } = parseReasonNote(item[cond.noteField]);
+  return (
+    <>
+      <div style="margin-bottom:4px;">
+        <div style="font-size:10px;color:#9ca3af;line-height:1.3;">외관</div>
+        <input
+          type="number"
+          min="0"
+          max="3"
+          step="1"
+          name={`${item.id}_${cond.appearanceInputName}`}
+          value={item[cond.appearanceField] ?? ""}
+          style="width:44px;font-size:12px;padding:2px 4px;"
+        />
+        <div style="display:flex;flex-direction:column;margin-top:2px;">
+          {APPEARANCE_REASON_OPTIONS.map((reason) => (
+            <label style="font-weight:normal;font-size:10px;color:#4b5563;display:flex;align-items:center;gap:2px;cursor:pointer;">
+              <input
+                type="checkbox"
+                name={`${item.id}_${cond.noteInputName}`}
+                value={reason}
+                checked={existingNotes.includes(reason)}
+                style="width:auto;padding:0;"
+              />
+              {reason}
+            </label>
+          ))}
+          <label style="font-weight:normal;font-size:10px;color:#4b5563;display:flex;align-items:center;gap:2px;cursor:pointer;">
+            <input
+              type="checkbox"
+              name={`${item.id}_${cond.noteInputName}`}
+              value={ETC_REASON}
+              checked={etcChecked}
+              style="width:auto;padding:0;"
+            />
+            {ETC_REASON}
+          </label>
+          <input
+            type="text"
+            name={`${item.id}_${cond.noteInputName}Etc`}
+            value={etcText}
+            placeholder="직접 입력"
+            style="width:60px;font-size:10px;padding:2px 4px;margin-top:2px;"
+          />
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:#9ca3af;line-height:1.3;">냄새</div>
+        <input
+          type="number"
+          min="0"
+          max="3"
+          step="1"
+          name={`${item.id}_${cond.odorInputName}`}
+          value={item[cond.odorField] ?? ""}
+          style="width:44px;font-size:12px;padding:2px 4px;"
+        />
+      </div>
+      {cond.isC25 && (
+        <div style="margin-top:4px;display:flex;flex-direction:column;gap:2px;">
+          <input
+            type="text"
+            name={`${item.id}_ph25c`}
+            value={item.ph25c ?? ""}
+            placeholder="pH"
+            style="width:70px;font-size:10px;padding:2px 4px;"
+          />
+          <input
+            type="text"
+            name={`${item.id}_viscosity25c`}
+            value={item.viscosity25c ?? ""}
+            placeholder="점(경)도"
+            style="width:70px;font-size:10px;padding:2px 4px;"
+          />
+          <input
+            type="text"
+            name={`${item.id}_specificGravity25c`}
+            value={item.specificGravity25c ?? ""}
+            placeholder="비중"
+            style="width:70px;font-size:10px;padding:2px 4px;"
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
+const CYCLE_NUMBERS = Array.from({ length: FT_TOTAL_CYCLES }, (_, i) => i + 1);
+
+// F/T·Cyc 표 (엑셀 R1 33~34행과 같은 모양: 행=F/T·Cyc, 열=1~3 Cycle).
+// 아직 도래하지 않은 싸이클 칸은 비워두고, 하나도 도래하지 않았으면 표 자체를 숨깁니다.
+function renderCycleTable(items: Schedule[], todayStr: string, mode: "view" | "edit") {
+  const cycleRows = [
+    { cond: FT_CONDITION, find: (n: number) => items.find((i) => ftCycleOf(i.ftStep) === n) },
+    { cond: CYC_CONDITION, find: (n: number) => items.find((i) => i.cycCycle === n) },
+  ];
+  const isDue = (item: Schedule | undefined): item is Schedule => !!item && item.targetDate <= todayStr;
+  if (!cycleRows.some((r) => CYCLE_NUMBERS.some((n) => isDue(r.find(n))))) return null;
+
+  return (
+    <div class="scroll-x" style="margin-top:12px;">
+      <table class="stability-table">
+        <colgroup>
+          <col style="width:44px" />
+          {CYCLE_NUMBERS.map(() => (
+            <col />
+          ))}
+        </colgroup>
+        <thead>
+          <tr>
+            <th>구분</th>
+            {CYCLE_NUMBERS.map((n) => (
+              <th>{n} Cycle</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {cycleRows.map(({ cond, find }) => (
+            <tr>
+              <td>{cond.label}</td>
+              {CYCLE_NUMBERS.map((n) => {
+                const item = find(n);
+                if (!isDue(item)) return <td></td>;
+                return (
+                  <td>
+                    <div style="font-size:10px;color:#6b7280;margin-bottom:2px;">
+                      {shortDate(item.targetDate)} {String(item.targetHour).padStart(2, "0")}:
+                      {String(item.targetMinute).padStart(2, "0")}
+                    </div>
+                    {mode === "view" ? renderViewCell(item, cond) : renderEditCell(item, cond)}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -240,6 +408,9 @@ adminRoutes.get("/admin", async (c) => {
           클릭한 시각(KST) 기준으로 1일 / 1주 / 2주 / 1개월 / 2개월 / 3개월 후 같은 시각에
           Teams로 알람이 예약됩니다. pH/점(경)도/Specific gravity는 0일(시작 시점) 측정값으로,
           입력하지 않으면 빈 칸으로 남습니다.
+          <br />
+          F/T(냉동 24시간 + 해동 24시간)와 Cyc(24시간)도 함께 3싸이클씩 예약됩니다. 시작 직후 F/T 시료를
+          냉동해주세요. 이후 24시간마다 냉동/해동 전환 알림과 싸이클 종료 시 안정도 확인 알람이 옵니다.
         </p>
       </div>
 
@@ -259,7 +430,8 @@ adminRoutes.get("/admin", async (c) => {
           {batchList.map(([batchId, batch]) => {
             const inProgress = batch.items.some((item) => item.label !== "0일" && !item.acknowledgedAt);
             // 아직 도래하지 않은 구간은 목록에서 숨겼다가, 예정일이 되면 (미입력 시 "-"로) 표시합니다.
-            const visibleItems = batch.items.filter((item) => item.targetDate <= todayStr);
+            // 2일~6일처럼 F/T·Cyc만 확인하는 구간은 아래 F/T·Cycle 표에 따로 보여줍니다.
+            const visibleItems = batch.items.filter((item) => item.mainCheck && item.targetDate <= todayStr);
             return (
             <div class="stability-batch-card" data-batch-id={batchId} style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px;">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
@@ -315,23 +487,14 @@ adminRoutes.get("/admin", async (c) => {
                             </div>
                           </td>
                           {CONDITIONS.map((cond) => (
-                            <td>
-                              <div style="margin-bottom:2px;">
-                                <div style="font-size:10px;color:#9ca3af;line-height:1.3;">외관</div>
-                                <div>{renderGrade(item[cond.appearanceField], item[cond.noteField])}</div>
-                              </div>
-                              <div>
-                                <div style="font-size:10px;color:#9ca3af;line-height:1.3;">냄새</div>
-                                <div>{renderOdor(item[cond.odorField])}</div>
-                              </div>
-                              {cond.isC25 && renderExtra25(item.ph25c, item.viscosity25c, item.specificGravity25c)}
-                            </td>
+                            <td>{renderViewCell(item, cond)}</td>
                           ))}
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+                {renderCycleTable(batch.items, todayStr, "view")}
                 <form method="post" action={`/admin/stability/${batchId}/conclusion`} class="row" style="margin-top:12px;">
                   <div style="flex:1">
                     <label>결론 한 줄 평 (엑셀 Conclusion에 반영)</label>
@@ -403,100 +566,15 @@ adminRoutes.get("/admin", async (c) => {
                                 {String(item.targetHour).padStart(2, "0")}:{String(item.targetMinute).padStart(2, "0")}
                               </div>
                             </td>
-                            {CONDITIONS.map((cond) => {
-                              const { checked: existingNotes, etcChecked, etcText } = parseReasonNote(
-                                item[cond.noteField]
-                              );
-                              return (
-                                <td>
-                                  <div style="margin-bottom:4px;">
-                                    <div style="font-size:10px;color:#9ca3af;line-height:1.3;">외관</div>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      max="3"
-                                      step="1"
-                                      name={`${item.id}_${cond.appearanceInputName}`}
-                                      value={item[cond.appearanceField] ?? ""}
-                                      style="width:44px;font-size:12px;padding:2px 4px;"
-                                    />
-                                    <div style="display:flex;flex-direction:column;margin-top:2px;">
-                                      {APPEARANCE_REASON_OPTIONS.map((reason) => (
-                                        <label style="font-weight:normal;font-size:10px;color:#4b5563;display:flex;align-items:center;gap:2px;cursor:pointer;">
-                                          <input
-                                            type="checkbox"
-                                            name={`${item.id}_${cond.noteInputName}`}
-                                            value={reason}
-                                            checked={existingNotes.includes(reason)}
-                                            style="width:auto;padding:0;"
-                                          />
-                                          {reason}
-                                        </label>
-                                      ))}
-                                      <label style="font-weight:normal;font-size:10px;color:#4b5563;display:flex;align-items:center;gap:2px;cursor:pointer;">
-                                        <input
-                                          type="checkbox"
-                                          name={`${item.id}_${cond.noteInputName}`}
-                                          value={ETC_REASON}
-                                          checked={etcChecked}
-                                          style="width:auto;padding:0;"
-                                        />
-                                        {ETC_REASON}
-                                      </label>
-                                      <input
-                                        type="text"
-                                        name={`${item.id}_${cond.noteInputName}Etc`}
-                                        value={etcText}
-                                        placeholder="직접 입력"
-                                        style="width:60px;font-size:10px;padding:2px 4px;margin-top:2px;"
-                                      />
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <div style="font-size:10px;color:#9ca3af;line-height:1.3;">냄새</div>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      max="3"
-                                      step="1"
-                                      name={`${item.id}_${cond.odorInputName}`}
-                                      value={item[cond.odorField] ?? ""}
-                                      style="width:44px;font-size:12px;padding:2px 4px;"
-                                    />
-                                  </div>
-                                  {cond.isC25 && (
-                                    <div style="margin-top:4px;display:flex;flex-direction:column;gap:2px;">
-                                      <input
-                                        type="text"
-                                        name={`${item.id}_ph25c`}
-                                        value={item.ph25c ?? ""}
-                                        placeholder="pH"
-                                        style="width:70px;font-size:10px;padding:2px 4px;"
-                                      />
-                                      <input
-                                        type="text"
-                                        name={`${item.id}_viscosity25c`}
-                                        value={item.viscosity25c ?? ""}
-                                        placeholder="점(경)도"
-                                        style="width:70px;font-size:10px;padding:2px 4px;"
-                                      />
-                                      <input
-                                        type="text"
-                                        name={`${item.id}_specificGravity25c`}
-                                        value={item.specificGravity25c ?? ""}
-                                        placeholder="비중"
-                                        style="width:70px;font-size:10px;padding:2px 4px;"
-                                      />
-                                    </div>
-                                  )}
-                                </td>
-                              );
-                            })}
+                            {CONDITIONS.map((cond) => (
+                              <td>{renderEditCell(item, cond)}</td>
+                            ))}
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
+                  {renderCycleTable(batch.items, todayStr, "edit")}
                   <div class="row" style="margin-top:12px;">
                     <button type="submit">저장</button>
                     <button type="button" class="secondary edit-cancel">취소</button>
@@ -631,10 +709,15 @@ adminRoutes.post("/admin/stability", async (c) => {
       targetMinute: minute,
       label: cp.label,
       sent: false,
+      mainCheck: cp.main,
+      cycCycle: cp.cyc ?? null,
+      ftStep: cp.ft ?? null,
     };
   });
 
-  await db.insert(stabilitySchedules).values([dayZero, ...values]);
+  // D1은 쿼리 하나당 바인딩 값이 100개로 제한되어, 행마다 INSERT를 나눠 batch(한 번에 원자적으로)로 보냅니다.
+  const [firstInsert, ...restInserts] = [dayZero, ...values].map((v) => db.insert(stabilitySchedules).values(v));
+  await db.batch([firstInsert, ...restInserts]);
 
   return c.redirect("/admin");
 });
@@ -707,7 +790,7 @@ adminRoutes.post("/admin/stability/:batchId/edit", async (c) => {
   const body = await c.req.parseBody({ all: true });
 
   const rows = await db
-    .select({ id: stabilitySchedules.id })
+    .select()
     .from(stabilitySchedules)
     .where(eq(stabilitySchedules.batchId, batchId));
 
@@ -719,9 +802,13 @@ adminRoutes.post("/admin/stability/:batchId/edit", async (c) => {
     return Number.isInteger(parsed) && parsed >= 0 && parsed <= 3 ? parsed : null;
   }
 
+  // 폼에 실제로 표시된(=제출된) 칸만 저장합니다. 화면에 안 보이는 구간/조건은 건드리지 않습니다.
+  const has = (key: string) => Object.prototype.hasOwnProperty.call(body, key);
+
   for (const row of rows) {
     const values: Record<string, number | string | null> = {};
-    for (const cond of CONDITIONS) {
+    for (const cond of conditionsFor(row)) {
+      if (!has(`${row.id}_${cond.appearanceInputName}`)) continue;
       const appearanceGrade = parseGrade(body[`${row.id}_${cond.appearanceInputName}`]);
       values[cond.appearanceField] = appearanceGrade;
       values[cond.odorField] = parseGrade(body[`${row.id}_${cond.odorInputName}`]);
@@ -734,14 +821,17 @@ adminRoutes.post("/admin/stability/:batchId/edit", async (c) => {
       values[cond.noteField] = appearanceGrade && appearanceGrade > 0 ? noteValue : null;
     }
 
-    const ph25c = body[`${row.id}_ph25c`];
-    const viscosity25c = body[`${row.id}_viscosity25c`];
-    const specificGravity25c = body[`${row.id}_specificGravity25c`];
-    values.ph25c = typeof ph25c === "string" && ph25c.trim() ? ph25c.trim() : null;
-    values.viscosity25c = typeof viscosity25c === "string" && viscosity25c.trim() ? viscosity25c.trim() : null;
-    values.specificGravity25c =
-      typeof specificGravity25c === "string" && specificGravity25c.trim() ? specificGravity25c.trim() : null;
+    for (const [field, key] of [
+      ["ph25c", `${row.id}_ph25c`],
+      ["viscosity25c", `${row.id}_viscosity25c`],
+      ["specificGravity25c", `${row.id}_specificGravity25c`],
+    ] as const) {
+      if (!has(key)) continue;
+      const raw = body[key];
+      values[field] = typeof raw === "string" && raw.trim() ? raw.trim() : null;
+    }
 
+    if (Object.keys(values).length === 0) continue;
     await db.update(stabilitySchedules).set(values).where(eq(stabilitySchedules.id, row.id));
   }
 
@@ -829,6 +919,15 @@ adminRoutes.get("/ack/:id", async (c) => {
       .where(eq(stabilitySchedules.id, id));
   }
 
+  const ackConditions = conditionsFor(schedule);
+  const ftNotice = ftNoticeText(schedule.ftStep);
+  const sectionLabel = (cond: Condition) =>
+    cond === CYC_CONDITION
+      ? `Cyc ${schedule.cycCycle}싸이클`
+      : cond === FT_CONDITION
+        ? `F/T ${ftCycleOf(schedule.ftStep)}싸이클`
+        : cond.label;
+
   return c.html(
     <Layout title="안정도 확인">
       <div class="card">
@@ -837,8 +936,16 @@ adminRoutes.get("/ack/:id", async (c) => {
           <strong>{schedule.productName}</strong> · Lab No. {schedule.labNo} · {schedule.label} 경과
         </p>
         <p style="font-size:13px;color:#16a34a;">반복 알람이 해제되었습니다.</p>
+        {ftNotice && (
+          <p style="font-size:13px;color:#b45309;background:#fffbeb;padding:8px 12px;border-radius:6px;">
+            {ftNotice}
+          </p>
+        )}
+        {ackConditions.length === 0 ? (
+          <p>이 구간은 입력할 안정도 항목이 없습니다.</p>
+        ) : (
         <form method="post" action={`/ack/${id}`}>
-          {CONDITIONS.map((cond) => {
+          {ackConditions.map((cond) => {
             const { checked: existingNotes, etcChecked, etcText } = parseReasonNote(schedule[cond.noteField]);
             const noteBoxId = `note-${cond.appearanceInputName}`;
             const currentAppearance = schedule[cond.appearanceField];
@@ -847,7 +954,7 @@ adminRoutes.get("/ack/:id", async (c) => {
             return (
               <div class="row" style="border-top:1px solid #e5e7eb;padding-top:12px;margin-top:12px;">
                 <div style="flex:1">
-                  <label>{cond.label}</label>
+                  <label>{sectionLabel(cond)}</label>
                   <div style="display:flex;gap:28px;margin-top:6px;flex-wrap:wrap;">
                     <div>
                       <span style="font-size:12px;color:#6b7280;">Appearance (외관)</span>
@@ -946,6 +1053,7 @@ adminRoutes.get("/ack/:id", async (c) => {
           })}
           <button type="submit">저장</button>
         </form>
+        )}
         <script>
           {raw(`
           document.querySelectorAll('.grade-radio').forEach(function (radio) {
@@ -973,8 +1081,15 @@ adminRoutes.post("/ack/:id", async (c) => {
     return Number.isInteger(parsed) && parsed >= 0 && parsed <= 3 ? parsed : null;
   }
 
+  const [schedule] = await db
+    .select()
+    .from(stabilitySchedules)
+    .where(eq(stabilitySchedules.id, id))
+    .limit(1);
+  if (!schedule) return c.text("존재하지 않는 알람입니다.", 404);
+
   const values: Record<string, number | string | null> = {};
-  for (const cond of CONDITIONS) {
+  for (const cond of conditionsFor(schedule)) {
     const appearanceGrade = parseGrade(body[cond.appearanceInputName]);
     values[cond.appearanceField] = appearanceGrade;
     values[cond.odorField] = parseGrade(body[cond.odorInputName]);
@@ -987,17 +1102,16 @@ adminRoutes.post("/ack/:id", async (c) => {
     values[cond.noteField] = appearanceGrade && appearanceGrade > 0 ? noteValue : null;
   }
 
-  const ph25c = typeof body.ph25c === "string" ? body.ph25c.trim() : "";
-  const viscosity25c = typeof body.viscosity25c === "string" ? body.viscosity25c.trim() : "";
+  if (schedule.mainCheck) {
+    const ph25c = typeof body.ph25c === "string" ? body.ph25c.trim() : "";
+    const viscosity25c = typeof body.viscosity25c === "string" ? body.viscosity25c.trim() : "";
+    values.ph25c = ph25c || null;
+    values.viscosity25c = viscosity25c || null;
+  }
 
   await db
     .update(stabilitySchedules)
-    .set({
-      ...values,
-      ph25c: ph25c || null,
-      viscosity25c: viscosity25c || null,
-      acknowledgedAt: Date.now(),
-    })
+    .set({ ...values, acknowledgedAt: Date.now() })
     .where(eq(stabilitySchedules.id, id));
 
   return c.html(

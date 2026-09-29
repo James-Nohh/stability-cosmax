@@ -57,6 +57,20 @@ export const stabilitySchedules = sqliteTable("stability_schedules", {
   gradeOdorSunlight: integer("grade_odor_sunlight"),
   noteAppearanceSunlight: text("note_appearance_sunlight"),
 
+  // F/T(냉동 24h + 해동 24h = 1싸이클)·Cyc(24h = 1싸이클), 각 3싸이클.
+  // mainCheck: 이 구간에서 4℃~일광 5개 온도 조건을 확인하는지 (2일~6일 구간은 false)
+  // cycCycle : 이 구간에 끝나는 Cyc 싸이클 번호(1~3)
+  // ftStep   : 시작 후 몇 번째 24시간인지(1~6). 홀수=냉동 종료 알림, 짝수=해동 종료(싸이클 ftStep/2 확인)
+  mainCheck: integer("main_check", { mode: "boolean" }).notNull().default(true),
+  cycCycle: integer("cyc_cycle"),
+  ftStep: integer("ft_step"),
+  gradeAppearanceFt: integer("grade_appearance_ft"),
+  gradeOdorFt: integer("grade_odor_ft"),
+  noteAppearanceFt: text("note_appearance_ft"),
+  gradeAppearanceCyc: integer("grade_appearance_cyc"),
+  gradeOdorCyc: integer("grade_odor_cyc"),
+  noteAppearanceCyc: text("note_appearance_cyc"),
+
   // 25℃ 항목 전용 추가 측정값. specificGravity25c는 "0일"(안정도 시작 시점) 행에만 입력됩니다.
   ph25c: text("ph_25c"),
   viscosity25c: text("viscosity_25c"),

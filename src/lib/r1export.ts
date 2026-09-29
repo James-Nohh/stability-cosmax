@@ -199,14 +199,27 @@ export async function buildR1Workbook(batchRows: Schedule[], user: User): Promis
     }
   }
 
-  // F/T, Cycle 구간의 예시 숫자 데이터 제거 (양식/라벨은 그대로 유지)
-  const FT_CYCLE_ROWS = [33, 34];
-  const FT_CYCLE_COLS = [3, 6, 9, 15, 18, 21]; // C, F, I, O, R, U
-  for (const r of FT_CYCLE_ROWS) {
-    for (const c of FT_CYCLE_COLS) {
+  // F/T, Cycle (33행 Appearance / 34행 Odor, 1·2·3 Cycle 열).
+  // 양식의 예시 숫자는 지우고, 실제로 입력된 싸이클만 채웁니다.
+  const FT_COLS = [3, 6, 9]; // C, F, I
+  const CYC_COLS = [15, 18, 21]; // O, R, U
+  for (const r of [33, 34]) {
+    for (const c of [...FT_COLS, ...CYC_COLS]) {
       ws.getCell(r, c).value = null;
     }
   }
+  FT_COLS.forEach((col, i) => {
+    const row = batchRows.find((r) => r.ftStep === (i + 1) * 2);
+    if (!row) return;
+    setGradeCell(ws.getCell(33, col), row.gradeAppearanceFt, row.noteAppearanceFt);
+    setGradeCell(ws.getCell(34, col), row.gradeOdorFt, null);
+  });
+  CYC_COLS.forEach((col, i) => {
+    const row = batchRows.find((r) => r.cycCycle === i + 1);
+    if (!row) return;
+    setGradeCell(ws.getCell(33, col), row.gradeAppearanceCyc, row.noteAppearanceCyc);
+    setGradeCell(ws.getCell(34, col), row.gradeOdorCyc, null);
+  });
 
   // Conclusion: 2)/3) 항목은 삭제하고, 1) 자리에 사용자가 이어 쓸 수 있도록 "-->" 표시
   ws.getCell("A43").value = `--> ${first.conclusion ?? ""}`.trimEnd();
