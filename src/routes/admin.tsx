@@ -442,8 +442,9 @@ adminRoutes.get("/admin", async (c) => {
                   <div style="color:#6b7280;font-size:13px;">Lab No. {batch.labNo}</div>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center;">
-                  <a href={`/admin/stability/${batchId}/export`} class="btn-excel">
-                    엑셀 다운로드
+                  <a href={`/admin/stability/${batchId}/export`} class="btn-excel btn-two-line">
+                    <span>안정도</span>
+                    <span>엑셀 다운로드</span>
                   </a>
                   <button type="button" class="btn-edit edit-toggle">수정</button>
                   <form
