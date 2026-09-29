@@ -436,8 +436,10 @@ adminRoutes.get("/admin", async (c) => {
             <div class="stability-batch-card" data-batch-id={batchId} style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px;">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                 <div>
-                  <strong>{batch.productName}</strong>{" "}
-                  <span style="color:#6b7280;">· Lab No. {batch.labNo}</span>
+                  <div>
+                    <strong>{batch.productName}</strong>
+                  </div>
+                  <div style="color:#6b7280;font-size:13px;">Lab No. {batch.labNo}</div>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center;">
                   <a href={`/admin/stability/${batchId}/export`} class="btn-excel">
