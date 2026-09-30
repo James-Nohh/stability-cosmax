@@ -27,9 +27,10 @@ export const Layout: FC<PropsWithChildren<{ title: string; showNav?: boolean }>>
         button { height: 36px; background: #2563eb; color: #fff; border: none; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
         button.danger { background: #dc2626; }
         button.secondary { background: #6b7280; }
-        a.btn-excel, .btn-edit { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; height: 36px; padding: 0 10px; border-radius: 4px; border: none; font-size: 14px; text-decoration: none; white-space: nowrap; flex-shrink: 0; cursor: pointer; }
+        a.btn-excel, .btn-edit, .btn-docs { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; height: 36px; padding: 0 10px; border-radius: 4px; border: none; font-size: 14px; text-decoration: none; white-space: nowrap; flex-shrink: 0; cursor: pointer; }
         a.btn-excel { background: #217346; color: #fff; }
-        a.btn-two-line { flex-direction: column; font-size: 11px; line-height: 1.25; }
+        .btn-docs { background: #4f46e5; color: #fff; }
+        .btn-two-line { flex-direction: column; font-size: 11px; line-height: 1.25; }
         .btn-edit { background: #f59e0b; color: #fff; }
         fieldset { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
         fieldset legend { font-weight: 600; padding: 0 6px; }
