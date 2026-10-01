@@ -30,6 +30,7 @@ export const Layout: FC<PropsWithChildren<{ title: string; showNav?: boolean }>>
         a.btn-excel, .btn-edit, .btn-docs { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; height: 36px; padding: 0 10px; border-radius: 4px; border: none; font-size: 14px; text-decoration: none; white-space: nowrap; flex-shrink: 0; cursor: pointer; }
         a.btn-excel { background: #217346; color: #fff; }
         .btn-docs { background: #4f46e5; color: #fff; }
+        button.btn-photo { height: auto; padding: 2px 6px; margin-top: 4px; font-size: 11px; background: #0ea5e9; }
         a.btn-two-line, button.btn-two-line { flex-direction: column; font-size: 11px; line-height: 1.25; }
         .btn-edit { background: #f59e0b; color: #fff; }
         fieldset { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }

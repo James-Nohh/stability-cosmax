@@ -486,7 +486,10 @@ adminRoutes.get("/admin", async (c) => {
                     <tbody>
                       {visibleItems.map((item) => (
                         <tr>
-                          <td>{segmentLabel(item.label)}</td>
+                          <td>
+                            <div>{segmentLabel(item.label)}</div>
+                            <button type="button" class="btn-photo">사진</button>
+                          </td>
                           <td>
                             <div>{shortDate(item.targetDate)}</div>
                             <div style="font-size:11px;color:#6b7280;">
