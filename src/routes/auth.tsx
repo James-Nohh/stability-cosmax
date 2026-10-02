@@ -20,7 +20,8 @@ authRoutes.get("/login", (c) => {
   return c.html(
     <Layout title="로그인" showNav={false}>
       <div class="card" style="max-width: 360px; margin: 60px auto;">
-        <h2>로그인</h2>
+        <img src="/static/cosmax-logo.png" alt="COSMAX" class="login-logo" />
+        <h2>안정도 관리 로그인</h2>
         {error && <p class="error">아이디 또는 비밀번호가 올바르지 않습니다.</p>}
         <form method="post" action="/login">
           <input type="hidden" name="redirect" value={redirect} />

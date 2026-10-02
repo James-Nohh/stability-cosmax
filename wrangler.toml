@@ -10,7 +10,7 @@ crons = ["* * * * *"]
 # R1 엑셀 템플릿을 바이너리로 번들에 포함시킵니다.
 [[rules]]
 type = "Data"
-globs = ["**/*.xlsx"]
+globs = ["**/*.xlsx", "**/*.png"]
 fallthrough = true
 
 [[d1_databases]]
