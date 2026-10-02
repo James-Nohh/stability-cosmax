@@ -14,6 +14,17 @@ const BURST_GAP_MS = 6 * 60 * 60 * 1000; // 그 후 6시간마다 버스트 반�
 
 type Schedule = typeof stabilitySchedules.$inferSelect;
 
+// 안정도 확인 알람 끝에 붙는 한 줄 응원 문구 (매번 무작위)
+const CHEERS = [
+  "💪 오늘도 꼼꼼한 확인 감사합니다!",
+  "🧪 제형은 정직해요. 오늘 상태 한번 볼까요?",
+  "🔬 작은 변화도 놓치지 않는 당신이 최고!",
+  "🌱 제형이 무럭무럭 자라고 있어요. 확인하러 가볼까요?",
+  "☕ 커피 한 모금 하고 가볍게 확인해요!",
+  "🏃 지금 확인하면 진행도가 한 칸 쑥!",
+  "✨ 기록이 쌓일수록 결과가 빛납니다.",
+];
+
 // 이 구간에 입력할 안정도 항목이 있는지. 없으면(예: F/T 냉동 종료만 있는 5일) 알림만 1회 보냅니다.
 function hasCheckItems(s: Schedule): boolean {
   return s.mainCheck || s.cycCycle != null || ftCycleOf(s.ftStep) != null;
@@ -151,6 +162,7 @@ async function sendAndLog(env: Env, db: DrizzleD1Database, schedule: Schedule) {
 
   const caution = checkItems ? await buildCautionText(db, schedule) : null;
   if (caution) parts.push(`⚠️\n\n${caution}`);
+  if (checkItems) parts.push(CHEERS[Math.floor(Math.random() * CHEERS.length)]);
 
   const message = parts.join("\n\n");
   const results = await Promise.allSettled([

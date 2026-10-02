@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -91,6 +91,17 @@ export const batchLogs = sqliteTable("batch_logs", {
   detail: text("detail"),
   runAt: text("run_at").notNull().default("CURRENT_TIMESTAMP"),
 });
+
+// 배치별 축하 알림 발송 기록 ('ft' = F/T 3싸이클 완료, 'complete' = 전체 완주)
+export const batchCelebrations = sqliteTable(
+  "batch_celebrations",
+  {
+    batchId: text("batch_id").notNull(),
+    kind: text("kind").notNull(),
+    sentAt: integer("sent_at").notNull(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.batchId, t.kind] }) })
+);
 
 // 배치(제품)별 엑셀 다운로드 이력. 배치 삭제 시 함께 지웁니다.
 export const exportLogs = sqliteTable("export_logs", {

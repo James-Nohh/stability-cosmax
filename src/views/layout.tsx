@@ -43,6 +43,15 @@ export const Layout: FC<PropsWithChildren<{ title: string; showNav?: boolean }>>
         .badge.on { background: #dcfce7; color: #166534; }
         .badge.off { background: #f3f4f6; color: #6b7280; }
         .scroll-x { overflow-x: auto; }
+        .progress-strip { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; padding: 6px 10px; background: #f9fafb; border-radius: 6px; }
+        .progress-emoji { font-size: 20px; line-height: 1; }
+        .progress-steps { display: flex; gap: 3px; }
+        .progress-step { font-size: 10px; padding: 2px 5px; border-radius: 999px; background: #f3f4f6; color: #9ca3af; }
+        .progress-step.done { background: #dcfce7; color: #166534; }
+        .progress-step.due { background: #ffedd5; color: #9a3412; font-weight: 600; }
+        .progress-count { font-size: 12px; color: #4b5563; }
+        .progress-badge { font-size: 11px; padding: 2px 6px; border-radius: 999px; background: #e0e7ff; color: #3730a3; }
+        .progress-badge.complete { background: #fef3c7; color: #92400e; font-weight: 600; }
       `}</style>
     </head>
     <body>

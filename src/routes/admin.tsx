@@ -2,7 +2,9 @@ import { Hono } from "hono";
 import { drizzle } from "drizzle-orm/d1";
 import { eq, desc, inArray } from "drizzle-orm";
 import { raw } from "hono/utils/html";
-import { stabilitySchedules, batchLogs, exportLogs, users } from "../db/schema";
+import { stabilitySchedules, batchLogs, exportLogs, users, batchCelebrations } from "../db/schema";
+import { computeProgress } from "../lib/progress";
+import { maybeCelebrate } from "../lib/celebrate";
 import { requireAuth } from "../middleware/auth";
 import { Layout } from "../views/layout";
 import { kstTodayDateOnly, addDays, addMonths, formatDateStr, formatKstDateTime, nowKst } from "../lib/time";
@@ -432,6 +434,7 @@ adminRoutes.get("/admin", async (c) => {
             // 아직 도래하지 않은 구간은 목록에서 숨겼다가, 예정일이 되면 (미입력 시 "-"로) 표시합니다.
             // 2일~6일처럼 F/T·Cyc만 확인하는 구간은 아래 F/T·Cycle 표에 따로 보여줍니다.
             const visibleItems = batch.items.filter((item) => item.mainCheck && item.targetDate <= todayStr);
+            const progress = computeProgress(batch.items, todayStr);
             return (
             <div class="stability-batch-card" data-batch-id={batchId} style="border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:14px;">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
@@ -462,6 +465,26 @@ adminRoutes.get("/admin", async (c) => {
                     <button type="submit" class="danger">삭제</button>
                   </form>
                 </div>
+              </div>
+
+              <div class="progress-strip" title="등급을 입력한 구간만 완료로 셉니다">
+                <span class="progress-emoji">{progress.emoji}</span>
+                <div class="progress-steps">
+                  {progress.steps.map((step) => (
+                    <span
+                      class={`progress-step ${step.state}`}
+                      title={step.state === "done" ? "기록 완료" : step.state === "due" ? "확인 필요" : "예정"}
+                    >
+                      {step.label}
+                    </span>
+                  ))}
+                </div>
+                <span class="progress-count">
+                  {progress.doneCount}/{progress.total} 완료
+                </span>
+                {progress.ftDone && <span class="progress-badge">🧊🔥 F/T 완료</span>}
+                {progress.cycDone && <span class="progress-badge">🔄 Cyc 완료</span>}
+                {progress.complete && <span class="progress-badge complete">🏆 완주</span>}
               </div>
 
               <div class="view-panel">
@@ -749,6 +772,7 @@ adminRoutes.post("/admin/stability/:batchId/delete", async (c) => {
   }
   await db.delete(stabilitySchedules).where(eq(stabilitySchedules.batchId, batchId));
   await db.delete(exportLogs).where(eq(exportLogs.batchId, batchId));
+  await db.delete(batchCelebrations).where(eq(batchCelebrations.batchId, batchId));
 
   return c.redirect("/admin");
 });
@@ -844,6 +868,8 @@ adminRoutes.post("/admin/stability/:batchId/edit", async (c) => {
     if (Object.keys(values).length === 0) continue;
     await db.update(stabilitySchedules).set(values).where(eq(stabilitySchedules.id, row.id));
   }
+
+  await maybeCelebrate(c.env, db, batchId);
 
   return c.redirect("/admin");
 });
@@ -1123,6 +1149,8 @@ adminRoutes.post("/ack/:id", async (c) => {
     .update(stabilitySchedules)
     .set({ ...values, acknowledgedAt: Date.now() })
     .where(eq(stabilitySchedules.id, id));
+
+  await maybeCelebrate(c.env, db, schedule.batchId);
 
   return c.html(
     <Layout title="저장 완료">
